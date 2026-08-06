@@ -5,7 +5,8 @@ from urllib.request import Request, urlopen
 from uuid import uuid4
 
 import mercadopago
-from flask import Blueprint, abort, current_app, flash, g, redirect, session, url_for
+from flask import Blueprint, current_app, flash, g, redirect, request, session, url_for
+from itsdangerous import BadData, SignatureExpired, URLSafeTimedSerializer
 
 from models import (
     atualizar_pagamento,
@@ -21,6 +22,7 @@ from routes.auth import login_required
 
 pagamentos_bp = Blueprint("pagamentos", __name__)
 API_URL = "https://api.mercadopago.com"
+TEMPO_AUTORIZACAO_PAGAMENTO_SEGUNDOS = 20 * 60
 
 
 class MercadoPagoError(Exception):
@@ -28,6 +30,35 @@ class MercadoPagoError(Exception):
         self.status = status
         self.detalhes = detalhes
         super().__init__(f"Mercado Pago respondeu HTTP {status}: {detalhes}")
+
+
+def _serializador_autorizacao_pagamento():
+    return URLSafeTimedSerializer(
+        current_app.config["SECRET_KEY"], salt="sistemavenda.autorizacao-pagamento"
+    )
+
+
+def criar_autorizacao_pagamento(pedido):
+    """Gera um comprovante temporario, especifico para um pedido pendente."""
+    return _serializador_autorizacao_pagamento().dumps({
+        "pedido_id": pedido["id"],
+        "codigo": pedido["codigo_acompanhamento"],
+    })
+
+
+def autorizacao_pagamento_valida(pedido, autorizacao):
+    if not autorizacao:
+        return False
+    try:
+        dados = _serializador_autorizacao_pagamento().loads(
+            autorizacao, max_age=TEMPO_AUTORIZACAO_PAGAMENTO_SEGUNDOS
+        )
+    except (BadData, SignatureExpired):
+        return False
+    return (
+        dados.get("pedido_id") == pedido["id"]
+        and dados.get("codigo") == pedido["codigo_acompanhamento"]
+    )
 
 
 def mensagem_erro(detalhes):
@@ -188,11 +219,16 @@ def criar_checkout(venda_id):
 
 @pagamentos_bp.post("/pagamentos/pedido/<int:pedido_id>")
 def criar_checkout_pedido(pedido_id):
-    if session.get("pedido_pagamento_pendente") != pedido_id:
-        abort(403)
     pedido = obter_pedido(pedido_id)
     if pedido is None:
         return "Pedido nao encontrado", 404
+    autorizado_pela_sessao = session.get("pedido_pagamento_pendente") == pedido_id
+    autorizado_por_comprovante = autorizacao_pagamento_valida(
+        pedido, request.form.get("autorizacao_pagamento", "")
+    )
+    if not autorizado_pela_sessao and not autorizado_por_comprovante:
+        flash("A pagina de pagamento expirou. Inicie o pagamento novamente pelo carrinho.", "warning")
+        return redirect(url_for("cliente.loja"))
     itens = itens_pedido(pedido_id)
     preference = {
         "items": [{"title": item["descricao"], "quantity": item["quantidade"], "unit_price": float(item["valor_unitario"]), "currency_id": "BRL"} for item in itens],

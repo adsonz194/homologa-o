@@ -10,6 +10,7 @@
         <p class="text-muted">{{ descricao }}</p>
         <form id="form-pagamento" method="post" action="{{ destino }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          {% if autorizacao_pagamento %}<input type="hidden" name="autorizacao_pagamento" value="{{ autorizacao_pagamento }}">{% endif %}
           <button class="btn btn-primary">Continuar para pagamento</button>
         </form>
         <p class="small text-muted mt-3 mb-0">Se o redirecionamento n\u00e3o iniciar, use o bot\u00e3o acima.</p>

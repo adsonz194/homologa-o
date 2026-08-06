@@ -177,11 +177,17 @@ def iniciar_pagamento(pedido_id):
     if session.get("pedido_pagamento_pendente") != pedido_id:
         flash("Para sua seguranca, inicie o pagamento a partir do seu carrinho ou codigo de acompanhamento.", "warning")
         return redirect(url_for("cliente.loja"))
+    pedido_atual = obter_pedido(pedido_id)
+    if pedido_atual is None or pedido_atual["status_pagamento"] != "PENDENTE":
+        flash("Este pedido nao esta disponivel para um novo pagamento.", "warning")
+        return redirect(url_for("cliente.loja"))
+    from routes.pagamentos import criar_autorizacao_pagamento
     return render_template(
         "iniciar_pagamento.html",
         destino=url_for("pagamentos.criar_checkout_pedido", pedido_id=pedido_id),
         titulo="Preparando o pagamento",
         descricao="Voce sera direcionado ao ambiente seguro do Mercado Pago.",
+        autorizacao_pagamento=criar_autorizacao_pagamento(pedido_atual),
         auto_submit=True,
     )
 
