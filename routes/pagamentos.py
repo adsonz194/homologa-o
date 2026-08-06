@@ -205,7 +205,7 @@ def criar_checkout(venda_id):
     try:
         preference_id, checkout_url = criar_preferencia(preference, g.usuario["estabelecimento_id"])
         atualizar_preferencia(venda_id, preference_id)
-        return redirect(checkout_url)
+        return redirect(checkout_url, code=303)
     except MercadoPagoError as erro:
         current_app.logger.error("Mercado Pago recusou a preferencia (HTTP %s): %s", erro.status, erro.detalhes)
         atualizar_pagamento(venda_id, "CANCELADO")
@@ -247,7 +247,7 @@ def criar_checkout_pedido(pedido_id):
         preference_id, checkout_url = criar_preferencia(preference, pedido["estabelecimento_id"])
         atualizar_preferencia_pedido(pedido_id, preference_id)
         session.pop("pedido_pagamento_pendente", None)
-        return redirect(checkout_url)
+        return redirect(checkout_url, code=303)
     except MercadoPagoError as erro:
         current_app.logger.error("Mercado Pago recusou o pedido %s (HTTP %s): %s", pedido_id, erro.status, erro.detalhes)
         atualizar_pagamento_pedido(pedido_id, "CANCELADO")

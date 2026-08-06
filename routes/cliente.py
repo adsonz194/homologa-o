@@ -169,7 +169,11 @@ def finalizar():
         return redirect(url_for("cliente.carrinho"))
     session.pop("carrinho", None)
     session["pedido_pagamento_pendente"] = pedido_id
-    return redirect(url_for("cliente.iniciar_pagamento", pedido_id=pedido_id))
+    # A preferencia e criada na propria resposta ao clique do cliente. Isso
+    # evita que Safari/iOS bloqueie um redirecionamento externo iniciado por
+    # JavaScript em uma pagina intermediaria.
+    from routes.pagamentos import criar_checkout_pedido
+    return criar_checkout_pedido(pedido_id)
 
 
 @cliente_bp.get("/cliente/pagamento/<int:pedido_id>/iniciar")
@@ -302,7 +306,8 @@ def reiniciar_pagamento(codigo):
         flash("Este pedido nao esta aguardando um novo pagamento.", "warning")
         return redirect(url_for("cliente.pedido", codigo=pedido_atual["codigo_acompanhamento"]))
     session["pedido_pagamento_pendente"] = pedido_atual["id"]
-    return redirect(url_for("cliente.iniciar_pagamento", pedido_id=pedido_atual["id"]))
+    from routes.pagamentos import criar_checkout_pedido
+    return criar_checkout_pedido(pedido_atual["id"])
 
 
 @cliente_bp.route("/cliente/acompanhar", methods=["GET", "POST"])
