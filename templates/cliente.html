@@ -1,13 +1,9 @@
 {% extends 'base.html' %}
 {% block title %}{{ estabelecimento.nome }} | Delivery{% endblock %}
 {% block content %}
-<section class="hero-delivery d-md-flex justify-content-between align-items-center gap-4">
-  <div>
-    <div class="hero-kicker">Delivery online</div>
-    <h1>{{ estabelecimento.nome }}</h1>
-    <p>Escolha seus favoritos e receba onde estiver.</p>
-  </div>
-  <a class="btn btn-lg text-nowrap" href="{{ url_for('cliente.carrinho') }}">Ver carrinho{% if quantidade_carrinho %} ({{ quantidade_carrinho }}){% endif %}</a>
+<section class="delivery-topbar">
+  <div><div class="delivery-kicker">Delivery online</div><p>Escolha seus favoritos e receba onde estiver.</p></div>
+  <a class="cart-quick-link" href="{{ url_for('cliente.carrinho') }}">Carrinho{% if quantidade_carrinho %}<span>{{ quantidade_carrinho }}</span>{% endif %}</a>
 </section>
 
 {% if funcionamento.aberto %}

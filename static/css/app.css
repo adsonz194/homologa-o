@@ -60,6 +60,12 @@ body.app-body {
 .hero-delivery p { margin: 0; color: rgba(255,255,255,.8); }
 .hero-delivery .btn { background: #fff; border-color: #fff; color: var(--brand-dark); }
 .hero-delivery .btn:hover { background: var(--brand-soft); border-color: var(--brand-soft); }
+.delivery-topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+.delivery-topbar p { margin: 5px 0 0; color: var(--muted); font-size: .9rem; }
+.delivery-kicker { color: var(--brand); font-size: 1.2rem; font-weight: 850; letter-spacing: -.035em; }
+.cart-quick-link { display: inline-flex; align-items: center; gap: 7px; padding: .5rem .72rem; border: 1px solid var(--line); border-radius: 10px; color: var(--brand-dark); background: var(--surface); box-shadow: 0 5px 12px rgba(15,23,42,.06); font-size: .82rem; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.cart-quick-link:hover { color: var(--brand-dark); background: var(--brand-soft); border-color: #c7d2fe; }
+.cart-quick-link span { display: grid; min-width: 18px; height: 18px; place-items: center; padding: 0 4px; border-radius: 999px; color: #fff; background: var(--brand); font-size: .68rem; }
 .product-card { height: 100%; border-radius: 16px; transition: transform .18s ease, box-shadow .18s ease; }
 .product-card:hover { transform: translateY(-4px); box-shadow: 0 20px 34px rgba(15,23,42,.12) !important; }
 .product-card .card-body { display: flex; flex-direction: column; padding: 1.35rem; }
@@ -99,6 +105,9 @@ body.app-body {
   .page-heading .btn { width: 100%; }
   .hero-delivery { padding: 24px; border-radius: 19px; }
   .hero-delivery .btn { width: 100%; margin-top: 16px; }
+  .delivery-topbar { align-items: center; margin-bottom: 17px; }
+  .delivery-topbar p { display: none; }
+  .delivery-kicker { font-size: 1.1rem; }
   .summary-card { position: static; }
   .table-responsive { overflow: visible; }
   .table.mobile-cards, .table.mobile-cards tbody, .table.mobile-cards tr, .table.mobile-cards td { display: block; width: 100%; }
