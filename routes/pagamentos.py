@@ -217,13 +217,13 @@ def criar_checkout(venda_id):
     return redirect(url_for("vendas.sucesso", venda_id=venda_id))
 
 
-@pagamentos_bp.post("/pagamentos/pedido/<int:pedido_id>")
+@pagamentos_bp.route("/pagamentos/pedido/<int:pedido_id>", methods=["GET", "POST"])
 def criar_checkout_pedido(pedido_id):
     pedido = obter_pedido(pedido_id)
     if pedido is None:
         return "Pedido nao encontrado", 404
     autorizado_pela_sessao = session.get("pedido_pagamento_pendente") == pedido_id
-    autorizado_por_comprovante = autorizacao_pagamento_valida(
+    autorizado_por_comprovante = request.method == "POST" and autorizacao_pagamento_valida(
         pedido, request.form.get("autorizacao_pagamento", "")
     )
     if not autorizado_pela_sessao and not autorizado_por_comprovante:
@@ -247,7 +247,9 @@ def criar_checkout_pedido(pedido_id):
         preference_id, checkout_url = criar_preferencia(preference, pedido["estabelecimento_id"])
         atualizar_preferencia_pedido(pedido_id, preference_id)
         session.pop("pedido_pagamento_pendente", None)
-        return redirect(checkout_url, code=303)
+        # O 302 e o encadeamento de redirecionamentos normal do navegador
+        # reproduzem o fluxo que ja funcionava em computadores e celulares.
+        return redirect(checkout_url)
     except MercadoPagoError as erro:
         current_app.logger.error("Mercado Pago recusou o pedido %s (HTTP %s): %s", pedido_id, erro.status, erro.detalhes)
         atualizar_pagamento_pedido(pedido_id, "CANCELADO")

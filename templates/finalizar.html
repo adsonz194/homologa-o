@@ -4,6 +4,7 @@
 <div class="page-heading"><h1>Finalizar pedido</h1><p>Informe os dados de entrega e escolha como deseja pagar.</p></div>
 <div class="row g-4"><div class="col-lg-7"><div class="card shadow-sm"><div class="card-body p-md-4">
   <form method="post" class="row g-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="col-12"><label class="form-label">Nome</label><input class="form-control" name="cliente" minlength="2" maxlength="100" required autocomplete="name" placeholder="Como devemos chamar voce?"></div>
     <div class="col-md-6"><label class="form-label">Telefone / WhatsApp</label><input class="form-control" name="telefone" inputmode="tel" maxlength="20" required autocomplete="tel" placeholder="(00) 00000-0000"></div>
     <div class="col-12"><label class="form-label">Endereco completo</label><textarea class="form-control" name="endereco" rows="4" minlength="8" maxlength="300" placeholder="Rua, numero, bairro e complemento" required></textarea></div>

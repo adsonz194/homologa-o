@@ -169,11 +169,10 @@ def finalizar():
         return redirect(url_for("cliente.carrinho"))
     session.pop("carrinho", None)
     session["pedido_pagamento_pendente"] = pedido_id
-    # A preferencia e criada na propria resposta ao clique do cliente. Isso
-    # evita que Safari/iOS bloqueie um redirecionamento externo iniciado por
-    # JavaScript em uma pagina intermediaria.
-    from routes.pagamentos import criar_checkout_pedido
-    return criar_checkout_pedido(pedido_id)
+    # Mantemos o mesmo encadeamento HTTP simples que era usado no checkout
+    # original: formulario -> rota do checkout -> Mercado Pago. Nao ha pagina
+    # intermediaria nem JavaScript para o Safari/iPhone bloquear.
+    return redirect(url_for("pagamentos.criar_checkout_pedido", pedido_id=pedido_id))
 
 
 @cliente_bp.get("/cliente/pagamento/<int:pedido_id>/iniciar")
@@ -185,15 +184,7 @@ def iniciar_pagamento(pedido_id):
     if pedido_atual is None or pedido_atual["status_pagamento"] != "PENDENTE":
         flash("Este pedido nao esta disponivel para um novo pagamento.", "warning")
         return redirect(url_for("cliente.loja"))
-    from routes.pagamentos import criar_autorizacao_pagamento
-    return render_template(
-        "iniciar_pagamento.html",
-        destino=url_for("pagamentos.criar_checkout_pedido", pedido_id=pedido_id),
-        titulo="Preparando o pagamento",
-        descricao="Voce sera direcionado ao ambiente seguro do Mercado Pago.",
-        autorizacao_pagamento=criar_autorizacao_pagamento(pedido_atual),
-        auto_submit=True,
-    )
+    return redirect(url_for("pagamentos.criar_checkout_pedido", pedido_id=pedido_id))
 
 
 def renderizar_pedido(pedido_atual, retorno_checkout=False):
@@ -306,8 +297,7 @@ def reiniciar_pagamento(codigo):
         flash("Este pedido nao esta aguardando um novo pagamento.", "warning")
         return redirect(url_for("cliente.pedido", codigo=pedido_atual["codigo_acompanhamento"]))
     session["pedido_pagamento_pendente"] = pedido_atual["id"]
-    from routes.pagamentos import criar_checkout_pedido
-    return criar_checkout_pedido(pedido_atual["id"])
+    return redirect(url_for("pagamentos.criar_checkout_pedido", pedido_id=pedido_atual["id"]))
 
 
 @cliente_bp.route("/cliente/acompanhar", methods=["GET", "POST"])
