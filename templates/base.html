@@ -26,7 +26,6 @@
           <span class="user-label d-none d-lg-inline">{{ usuario.nome }} &middot; {{ usuario.papel|lower }}</span>
           <form method="post" action="{{ url_for('auth.sair') }}"><button class="btn btn-light btn-sm">Sair</button></form>
         {% else %}
-          <a class="btn btn-outline-light btn-sm" href="{{ url_for('cliente.carrinho') }}">Carrinho</a>
           <a class="btn btn-outline-light btn-sm" href="{{ url_for('cliente.acompanhar_pedido') }}">Acompanhar pedido</a>
           <a class="btn btn-outline-light btn-sm" href="{{ url_for('cliente.loja') }}">Delivery</a>
         {% endif %}

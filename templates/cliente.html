@@ -3,7 +3,7 @@
 {% block content %}
 <section class="delivery-topbar">
   <div><div class="delivery-kicker">Delivery online</div><p>Escolha seus favoritos e receba onde estiver.</p></div>
-  <a class="cart-quick-link" href="{{ url_for('cliente.carrinho') }}">Carrinho{% if quantidade_carrinho %}<span>{{ quantidade_carrinho }}</span>{% endif %}</a>
+  <a class="cart-quick-link" href="{{ url_for('cliente.carrinho') }}"><i class="cart-icon" aria-hidden="true">&#128722;</i>Carrinho{% if quantidade_carrinho %}<span>{{ quantidade_carrinho }}</span>{% endif %}</a>
 </section>
 
 {% if funcionamento.aberto %}
