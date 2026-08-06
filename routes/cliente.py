@@ -15,6 +15,7 @@ from models import (
     obter_pedido,
     obter_pedido_por_codigo,
     obter_produto,
+    status_funcionamento_estabelecimento,
 )
 from nota_pdf import gerar_comprovante_pedido_pdf
 
@@ -57,6 +58,7 @@ def renderizar_loja():
         produtos=listar_produtos_disponiveis(estabelecimento["id"]),
         quantidade_carrinho=sum(carrinho_atual().values()),
         estabelecimento=estabelecimento,
+        funcionamento=status_funcionamento_estabelecimento(estabelecimento),
     )
 
 
@@ -70,6 +72,10 @@ def adicionar_ao_carrinho(produto_id):
     estabelecimento = estabelecimento_principal()
     if estabelecimento is None:
         return "Delivery indisponivel", 503
+    funcionamento = status_funcionamento_estabelecimento(estabelecimento)
+    if not funcionamento["aberto"]:
+        flash(funcionamento["mensagem"], "warning")
+        return redirect(url_for("cliente.loja"))
     try:
         quantidade = int(request.form.get("quantidade", 1))
         if quantidade <= 0:
@@ -98,11 +104,13 @@ def carrinho():
     estabelecimento = estabelecimento_principal()
     if estabelecimento is None:
         return "Delivery indisponivel", 503
+    funcionamento = status_funcionamento_estabelecimento(estabelecimento)
     itens = detalhes_carrinho(carrinho_atual(), estabelecimento["id"])
     subtotal = sum(item["subtotal"] for item in itens)
     total = subtotal + estabelecimento["valor_entrega"] if itens else subtotal
     return render_template(
-        "carrinho.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento
+        "carrinho.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento,
+        funcionamento=funcionamento,
     )
 
 
@@ -140,6 +148,10 @@ def finalizar():
     estabelecimento = estabelecimento_principal()
     if estabelecimento is None:
         return "Delivery indisponivel", 503
+    funcionamento = status_funcionamento_estabelecimento(estabelecimento)
+    if not funcionamento["aberto"]:
+        flash(funcionamento["mensagem"], "warning")
+        return redirect(url_for("cliente.carrinho"))
     itens = detalhes_carrinho(carrinho_atual(), estabelecimento["id"])
     if not itens:
         flash("Seu carrinho esta vazio.", "warning")

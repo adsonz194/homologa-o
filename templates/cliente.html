@@ -10,6 +10,12 @@
   <a class="btn btn-lg text-nowrap" href="{{ url_for('cliente.carrinho') }}">Ver carrinho{% if quantidade_carrinho %} ({{ quantidade_carrinho }}){% endif %}</a>
 </section>
 
+{% if funcionamento.aberto %}
+  <div class="alert alert-success py-2">{{ funcionamento.mensagem }}</div>
+{% else %}
+  <div class="alert alert-warning"><strong>Delivery fechado.</strong> {{ funcionamento.mensagem }} Horário normal: {{ funcionamento.horario }}.</div>
+{% endif %}
+
 <div class="page-heading d-flex flex-wrap justify-content-between align-items-end gap-2">
   <div><h2>Cardapio</h2><p>Itens disponiveis para pedir agora.</p></div>
   <a class="btn btn-outline-primary btn-sm" href="{{ url_for('cliente.acompanhar_pedido') }}">Acompanhar pedido</a>
@@ -24,7 +30,7 @@
       <p class="stock-label mb-3">{{ produto.estoque }} unidade(s) em estoque</p>
       <form method="post" action="{{ url_for('cliente.adicionar_ao_carrinho', produto_id=produto.id) }}" class="d-flex gap-2">
         <input class="form-control" type="number" name="quantidade" min="1" max="{{ produto.estoque }}" value="1" aria-label="Quantidade de {{ produto.descricao }}">
-        <button class="btn btn-success text-nowrap">Adicionar</button>
+        <button class="btn btn-success text-nowrap" {% if not funcionamento.aberto %}disabled{% endif %}>Adicionar</button>
       </form>
     </div></article></div>
   {% else %}

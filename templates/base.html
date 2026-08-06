@@ -17,6 +17,7 @@
         {% if usuario %}
           <a class="btn btn-outline-light btn-sm" href="{{ url_for('vendas.index') }}">Vendas</a>
           <a class="btn btn-outline-light btn-sm" href="{{ url_for('pedidos.index') }}">Pedidos</a>
+          <a class="btn btn-outline-light btn-sm" href="{{ url_for('vendas.relatorio') }}">Relatório</a>
           {% if usuario.papel == 'DONO' %}
             <a class="btn btn-outline-light btn-sm" href="{{ url_for('produtos.index') }}">Produtos</a>
             <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.usuarios') }}">Funcionarios</a>

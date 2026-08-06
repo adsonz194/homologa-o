@@ -1,6 +1,8 @@
 import base64
 import hashlib
+from datetime import datetime, time
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
 from cryptography.fernet import Fernet, InvalidToken
 from flask import current_app
@@ -10,6 +12,44 @@ from database import gerar_codigo_acompanhamento, get_db
 
 class EstoqueInsuficiente(ValueError):
     pass
+
+
+FUSO_HORARIO_LOJA = ZoneInfo("America/Sao_Paulo")
+DIAS_SEMANA = (
+    (0, "Segunda-feira"), (1, "Terca-feira"), (2, "Quarta-feira"),
+    (3, "Quinta-feira"), (4, "Sexta-feira"), (5, "Sabado"), (6, "Domingo"),
+)
+
+
+def data_hora_loja():
+    return datetime.now(FUSO_HORARIO_LOJA)
+
+
+def status_funcionamento_estabelecimento(estabelecimento, agora=None):
+    """Informa se o delivery pode receber novos pedidos neste momento."""
+    agora = agora or data_hora_loja()
+    hoje = agora.date()
+    try:
+        dias = {int(valor) for valor in str(estabelecimento["dias_funcionamento"] or "").split(",")}
+    except (TypeError, ValueError):
+        dias = set(range(7))
+    try:
+        abertura = time.fromisoformat(estabelecimento["horario_abertura"])
+        encerramento = time.fromisoformat(estabelecimento["horario_encerramento"])
+    except (TypeError, ValueError):
+        abertura, encerramento = time(8), time(22)
+    horario = f"{abertura.strftime('%H:%M')} às {encerramento.strftime('%H:%M')}"
+    fechado_manual = str(estabelecimento["fechado_hoje_data"] or "") == hoje.isoformat()
+    if fechado_manual:
+        return {"aberto": False, "fechado_manual": True, "horario": horario, "mensagem": "O delivery está fechado hoje."}
+    if hoje.weekday() not in dias:
+        return {"aberto": False, "fechado_manual": False, "horario": horario, "mensagem": "O delivery não funciona hoje."}
+    hora_atual = agora.timetz().replace(tzinfo=None)
+    if hora_atual < abertura:
+        return {"aberto": False, "fechado_manual": False, "horario": horario, "mensagem": f"O delivery abre hoje às {abertura.strftime('%H:%M')}."}
+    if hora_atual >= encerramento:
+        return {"aberto": False, "fechado_manual": False, "horario": horario, "mensagem": f"O delivery encerrou hoje às {encerramento.strftime('%H:%M')}."}
+    return {"aberto": True, "fechado_manual": False, "horario": horario, "mensagem": f"Aberto agora. Atendimento até {encerramento.strftime('%H:%M')}."}
 
 
 def obter_estabelecimento(estabelecimento_id):
@@ -96,11 +136,15 @@ def obter_url_publica_estabelecimento(estabelecimento_id=None):
 
 
 def atualizar_configuracao_estabelecimento(
-    estabelecimento_id, nome, whatsapp, valor_entrega, url_publica, access_token="", webhook_secret=""
+    estabelecimento_id, nome, whatsapp, valor_entrega, url_publica, dias_funcionamento,
+    horario_abertura, horario_encerramento, access_token="", webhook_secret=""
 ):
     """Atualiza configuracoes da loja sem devolver credenciais ao navegador."""
-    campos = ["nome = ?", "whatsapp = ?", "telefone = ?", "valor_entrega = ?", "url_publica = ?"]
-    valores = [nome, whatsapp, whatsapp, valor_entrega, url_publica]
+    campos = [
+        "nome = ?", "whatsapp = ?", "telefone = ?", "valor_entrega = ?", "url_publica = ?",
+        "dias_funcionamento = ?", "horario_abertura = ?", "horario_encerramento = ?",
+    ]
+    valores = [nome, whatsapp, whatsapp, valor_entrega, url_publica, dias_funcionamento, horario_abertura, horario_encerramento]
     if access_token:
         campos.append("mercadopago_token_criptografado = ?")
         valores.append(_criptografar_configuracao(access_token))
@@ -112,6 +156,15 @@ def atualizar_configuracao_estabelecimento(
     db.execute(
         f"UPDATE estabelecimentos SET {', '.join(campos)} WHERE id = ?",
         valores,
+    )
+    db.commit()
+
+
+def definir_fechado_hoje(estabelecimento_id, fechado):
+    db = get_db()
+    db.execute(
+        "UPDATE estabelecimentos SET fechado_hoje_data = ? WHERE id = ?",
+        (data_hora_loja().date().isoformat() if fechado else None, estabelecimento_id),
     )
     db.commit()
 
@@ -147,6 +200,33 @@ def obter_venda(venda_id, estabelecimento_id=None):
 
 def listar_vendas(estabelecimento_id):
     return get_db().execute("SELECT * FROM vendas WHERE estabelecimento_id = ? ORDER BY id DESC", (estabelecimento_id,)).fetchall()
+
+
+def relatorio_vendas(estabelecimento_id, data_inicio, data_fim):
+    """Itens de venda interna e delivery para o relatorio imprimivel."""
+    linhas = get_db().execute(
+        """SELECT 'INTERNA' AS canal, id, cliente,
+                  produto || ' × ' || quantidade AS descricao, forma_pagamento,
+                  valor_total, status_pagamento, criado_em
+           FROM vendas
+           WHERE estabelecimento_id = ? AND date(criado_em) BETWEEN date(?) AND date(?)
+           UNION ALL
+           SELECT 'DELIVERY' AS canal, pedidos.id, pedidos.cliente,
+                  COALESCE(GROUP_CONCAT(pedido_itens.quantidade || ' × ' || pedido_itens.descricao, ', '), ''),
+                  pedidos.forma_pagamento, pedidos.valor_total, pedidos.status_pagamento, pedidos.criado_em
+           FROM pedidos LEFT JOIN pedido_itens ON pedido_itens.pedido_id = pedidos.id
+           WHERE pedidos.estabelecimento_id = ? AND date(pedidos.criado_em) BETWEEN date(?) AND date(?)
+           GROUP BY pedidos.id
+           ORDER BY criado_em DESC, canal""",
+        (estabelecimento_id, data_inicio, data_fim, estabelecimento_id, data_inicio, data_fim),
+    ).fetchall()
+    resumo = {
+        "quantidade": len(linhas),
+        "aprovadas": sum(1 for linha in linhas if linha["status_pagamento"] == "APROVADO"),
+        "pendentes": sum(1 for linha in linhas if linha["status_pagamento"] == "PENDENTE"),
+        "recebido": sum(linha["valor_total"] for linha in linhas if linha["status_pagamento"] == "APROVADO"),
+    }
+    return linhas, resumo
 
 
 def atualizar_preferencia(venda_id, preference_id):

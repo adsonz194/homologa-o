@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}Relatório de vendas | Painel{% endblock %}
+{% block content %}
+<style>
+  @media print {
+    .app-header, .app-footer, .no-print { display: none !important; }
+    .app-shell { max-width: none; margin: 0; padding: 0; }
+    .card { border: 0; box-shadow: none !important; }
+    body { background: #fff; }
+  }
+</style>
+<div class="page-heading d-flex flex-wrap justify-content-between align-items-end gap-3">
+  <div><h1>Relatório de vendas</h1><p>{{ estabelecimento.nome }} · período de {{ data_inicio }} até {{ data_fim }}.</p></div>
+  <button class="btn btn-primary no-print" type="button" onclick="window.print()">Imprimir relatório</button>
+</div>
+<form class="card shadow-sm mb-4 no-print" method="get"><div class="card-body row g-3 align-items-end"><div class="col-md-4"><label class="form-label" for="inicio">Data inicial</label><input class="form-control" id="inicio" name="inicio" type="date" value="{{ data_inicio }}" required></div><div class="col-md-4"><label class="form-label" for="fim">Data final</label><input class="form-control" id="fim" name="fim" type="date" value="{{ data_fim }}" required></div><div class="col-md-4"><button class="btn btn-outline-primary w-100">Atualizar relatório</button></div></div></form>
+<section class="row g-3 mb-4"><div class="col-sm-6 col-lg-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Lançamentos</div><strong class="fs-3">{{ resumo.quantidade }}</strong></div></div></div><div class="col-sm-6 col-lg-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Pagamentos aprovados</div><strong class="fs-3 text-success">{{ resumo.aprovadas }}</strong></div></div></div><div class="col-sm-6 col-lg-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Pendentes</div><strong class="fs-3 text-warning">{{ resumo.pendentes }}</strong></div></div></div><div class="col-sm-6 col-lg-3"><div class="card h-100"><div class="card-body"><div class="text-muted small">Total recebido</div><strong class="fs-3">R$ {{ '%.2f'|format(resumo.recebido) }}</strong></div></div></div></section>
+<div class="card shadow-sm"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Data</th><th>Canal</th><th>Pedido</th><th>Cliente</th><th>Itens</th><th>Pagamento</th><th>Total</th><th>Status</th></tr></thead><tbody>{% for linha in linhas %}<tr><td>{{ linha.criado_em }}</td><td><span class="badge text-bg-{% if linha.canal == 'DELIVERY' %}info{% else %}secondary{% endif %}">{{ linha.canal }}</span></td><td>#{{ linha.id }}</td><td>{{ linha.cliente }}</td><td>{{ linha.descricao }}</td><td>{{ linha.forma_pagamento }}</td><td>R$ {{ '%.2f'|format(linha.valor_total) }}</td><td><span class="badge text-bg-{% if linha.status_pagamento == 'APROVADO' %}success{% elif linha.status_pagamento in ['CANCELADO', 'REJEITADO'] %}danger{% else %}warning{% endif %}">{{ linha.status_pagamento }}</span></td></tr>{% else %}<tr><td colspan="8"><div class="empty-state">Nenhuma venda nesse período.</div></td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

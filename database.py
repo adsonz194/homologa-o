@@ -38,6 +38,10 @@ def init_db():
         whatsapp TEXT NOT NULL DEFAULT '',
         valor_entrega REAL NOT NULL DEFAULT 6 CHECK(valor_entrega >= 0),
         url_publica TEXT NOT NULL DEFAULT '',
+        dias_funcionamento TEXT NOT NULL DEFAULT '0,1,2,3,4,5,6',
+        horario_abertura TEXT NOT NULL DEFAULT '08:00',
+        horario_encerramento TEXT NOT NULL DEFAULT '22:00',
+        fechado_hoje_data TEXT,
         mercadopago_token_criptografado TEXT,
         webhook_secret_criptografado TEXT,
         status_plano TEXT NOT NULL DEFAULT 'ATIVO' CHECK(status_plano IN ('PENDENTE', 'ATIVO', 'EXPIRADO', 'CANCELADO')),
@@ -127,6 +131,20 @@ def init_db():
             "UPDATE estabelecimentos SET valor_entrega = 6 WHERE id = ? AND valor_entrega = 0",
             (estabelecimento_padrao_id,),
         )
+    if "dias_funcionamento" not in colunas_estabelecimentos:
+        db.execute(
+            "ALTER TABLE estabelecimentos ADD COLUMN dias_funcionamento TEXT NOT NULL DEFAULT '0,1,2,3,4,5,6'"
+        )
+    if "horario_abertura" not in colunas_estabelecimentos:
+        db.execute(
+            "ALTER TABLE estabelecimentos ADD COLUMN horario_abertura TEXT NOT NULL DEFAULT '08:00'"
+        )
+    if "horario_encerramento" not in colunas_estabelecimentos:
+        db.execute(
+            "ALTER TABLE estabelecimentos ADD COLUMN horario_encerramento TEXT NOT NULL DEFAULT '22:00'"
+        )
+    if "fechado_hoje_data" not in colunas_estabelecimentos:
+        db.execute("ALTER TABLE estabelecimentos ADD COLUMN fechado_hoje_data TEXT")
     colunas_vendas = {coluna["name"] for coluna in db.execute("PRAGMA table_info(vendas)")}
     if "produto_id" not in colunas_vendas:
         db.execute("ALTER TABLE vendas ADD COLUMN produto_id INTEGER")

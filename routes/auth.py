@@ -1,3 +1,4 @@
+from datetime import datetime
 from functools import wraps
 import re
 import sqlite3
@@ -9,6 +10,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from models import (
     atualizar_configuracao_estabelecimento,
     criar_usuario,
+    definir_fechado_hoje,
     limpar_tentativas_login,
     listar_funcionarios,
     obter_estabelecimento,
@@ -17,9 +19,14 @@ from models import (
     obter_usuario_por_nome,
     quantidade_tentativas_login,
     registrar_tentativa_login,
+    status_funcionamento_estabelecimento,
 )
 
 auth_bp = Blueprint("auth", __name__)
+DIAS_FUNCIONAMENTO = (
+    ("0", "Seg"), ("1", "Ter"), ("2", "Qua"), ("3", "Qui"),
+    ("4", "Sex"), ("5", "Sáb"), ("6", "Dom"),
+)
 
 
 def _valor_monetario(texto):
@@ -27,6 +34,10 @@ def _valor_monetario(texto):
     if "," in valor:
         valor = valor.replace(".", "").replace(",", ".")
     return float(valor)
+
+
+def _horario_valido(texto):
+    return datetime.strptime(texto, "%H:%M").strftime("%H:%M")
 
 
 @auth_bp.before_app_request
@@ -117,6 +128,9 @@ def configuracoes():
             whatsapp = "".join(caractere for caractere in request.form.get("whatsapp", "") if caractere.isdigit())
             valor_entrega = _valor_monetario(request.form.get("valor_entrega", ""))
             url_publica = request.form.get("url_publica", "").strip().rstrip("/")
+            dias = sorted({dia for dia in request.form.getlist("dias_funcionamento") if dia in {str(numero) for numero, _ in DIAS_FUNCIONAMENTO}}, key=int)
+            horario_abertura = _horario_valido(request.form.get("horario_abertura", ""))
+            horario_encerramento = _horario_valido(request.form.get("horario_encerramento", ""))
             access_token = request.form.get("mercadopago_access_token", "").strip()
             webhook_secret = request.form.get("mercadopago_webhook_secret", "").strip()
             endereco = urlparse(url_publica)
@@ -126,17 +140,20 @@ def configuracoes():
                 or not 0 <= valor_entrega <= 1_000
                 or endereco.scheme != "https"
                 or not endereco.hostname
+                or not dias
+                or horario_abertura >= horario_encerramento
                 or len(access_token) > 500
                 or len(webhook_secret) > 500
             ):
                 raise ValueError
             atualizar_configuracao_estabelecimento(
-                estabelecimento["id"], nome, whatsapp, valor_entrega, url_publica, access_token, webhook_secret
+                estabelecimento["id"], nome, whatsapp, valor_entrega, url_publica,
+                ",".join(dias), horario_abertura, horario_encerramento, access_token, webhook_secret,
             )
-            flash("Configuracoes salvas. O novo frete ja aparece no carrinho e no pagamento.", "success")
+            flash("Configurações salvas. Horários, dias e frete já aparecem no delivery.", "success")
             return redirect(url_for("auth.configuracoes"))
         except (TypeError, ValueError):
-            flash("Confira nome, WhatsApp, URL HTTPS e valor de entrega.", "danger")
+            flash("Confira nome, WhatsApp, URL HTTPS, dias e horários de funcionamento.", "danger")
     estabelecimento = obter_estabelecimento(estabelecimento["id"])
     return render_template(
         "configuracoes.html",
@@ -144,7 +161,22 @@ def configuracoes():
         url_publica=estabelecimento["url_publica"] or current_app.config["BASE_URL"],
         token_configurado=bool(obter_token_mercadopago(estabelecimento["id"])),
         webhook_configurado=bool(obter_segredo_webhook_mercadopago(estabelecimento["id"])),
+        dias_funcionamento=DIAS_FUNCIONAMENTO,
+        dias_selecionados=set(str(estabelecimento["dias_funcionamento"] or "").split(",")),
+        funcionamento=status_funcionamento_estabelecimento(estabelecimento),
     )
+
+
+@auth_bp.post("/configuracoes/fechado-hoje")
+@owner_required
+def alternar_fechado_hoje():
+    estabelecimento = obter_estabelecimento(g.usuario["estabelecimento_id"])
+    if estabelecimento is None:
+        return "Estabelecimento nao encontrado", 404
+    fechar = request.form.get("acao") == "fechar"
+    definir_fechado_hoje(estabelecimento["id"], fechar)
+    flash("Delivery fechado hoje." if fechar else "Delivery reaberto para hoje.", "success")
+    return redirect(url_for("auth.configuracoes"))
 
 
 @auth_bp.route("/usuarios/novo", methods=["GET", "POST"])

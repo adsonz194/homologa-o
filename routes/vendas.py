@@ -1,7 +1,11 @@
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 from routes.auth import login_required
-from models import EstoqueInsuficiente, criar_venda, listar_vendas, obter_produto, obter_venda
+from models import (
+    EstoqueInsuficiente, criar_venda, data_hora_loja, listar_vendas,
+    obter_estabelecimento, obter_produto, obter_venda, relatorio_vendas,
+)
 
 vendas_bp = Blueprint("vendas", __name__)
 FORMAS_PAGAMENTO = {"PIX", "CREDITO", "DEBITO"}
@@ -15,6 +19,31 @@ def inicio():
 @login_required
 def index():
     return render_template("index.html", vendas=listar_vendas(g.usuario["estabelecimento_id"]))
+
+
+@vendas_bp.get("/painel/relatorio-vendas")
+@login_required
+def relatorio():
+    hoje = data_hora_loja().date()
+    try:
+        data_inicio = date.fromisoformat(request.args.get("inicio", hoje.isoformat()))
+        data_fim = date.fromisoformat(request.args.get("fim", hoje.isoformat()))
+        if data_inicio > data_fim:
+            raise ValueError
+    except ValueError:
+        flash("Escolha um período válido para o relatório.", "danger")
+        return redirect(url_for("vendas.relatorio"))
+    linhas, resumo = relatorio_vendas(
+        g.usuario["estabelecimento_id"], data_inicio.isoformat(), data_fim.isoformat()
+    )
+    return render_template(
+        "relatorio_vendas.html",
+        estabelecimento=obter_estabelecimento(g.usuario["estabelecimento_id"]),
+        linhas=linhas,
+        resumo=resumo,
+        data_inicio=data_inicio.isoformat(),
+        data_fim=data_fim.isoformat(),
+    )
 
 @vendas_bp.route("/vendas/nova", methods=["GET", "POST"])
 @login_required
