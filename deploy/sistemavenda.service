@@ -1,0 +1,19 @@
+[Unit]
+Description=Sistema de Delivery Menino dos Sonhos
+After=network.target
+
+[Service]
+Type=simple
+User=delivery
+Group=delivery
+WorkingDirectory=/opt/sistemavenda
+EnvironmentFile=/etc/sistemavenda/sistemavenda.env
+Environment="PATH=/opt/sistemavenda/.venv/bin"
+ExecStart=/opt/sistemavenda/.venv/bin/gunicorn --workers 1 --threads 4 --timeout 60 --bind 127.0.0.1:8000 --access-logfile - --error-logfile - app:app
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block title %}Pedido #{{ pedido.id }} | Delivery{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card order-card shadow-sm">
+      <div class="card-body p-4 text-center">
+        <p class="text-muted text-uppercase small fw-bold mb-1">Numero do pedido</p>
+        <h1 class="order-number mb-3">#{{ pedido.id }}</h1>
+        <p class="small text-muted mb-3">Codigo de acompanhamento: <code id="codigo-acompanhamento">{{ codigo_acompanhamento }}</code> <button class="btn btn-link btn-sm p-0 align-baseline" type="button" id="copiar-codigo">Copiar</button></p>
+        <p class="mb-1"><strong>Total:</strong> R$ {{ '%.2f'|format(pedido.valor_total) }}</p>
+        <p class="mb-4">Pagamento: <strong id="status-pagamento">{{ pedido.status_pagamento }}</strong></p>
+
+        <div class="tracking-box p-3 text-start">
+          <p class="mb-1 text-muted small">Acompanhamento do delivery</p>
+          <h2 class="h5 mb-3" id="status-operacional">{{ nome_status_operacional }}</h2>
+          <div class="d-flex flex-wrap gap-2 small" id="etapas-entrega">
+            <span class="badge text-bg-secondary" data-status="FILA_DE_ESPERA">Fila de espera</span>
+            <span class="badge text-bg-secondary" data-status="PREPARANDO">Em preparacao</span>
+            <span class="badge text-bg-secondary" data-status="PRONTO">Pronto</span>
+            <span class="badge text-bg-secondary" data-status="SAIU_PARA_ENTREGA">Saiu para entrega</span>
+            <span class="badge text-bg-secondary" data-status="ENTREGUE">Entregue</span>
+          </div>
+        </div>
+
+        <div id="confirmacao" class="alert alert-success mt-4 d-none">
+          Pagamento aprovado. Voce sera direcionado ao WhatsApp da empresa.
+        </div>
+        <a id="botao-whatsapp" class="btn btn-success mt-3 d-none" href="#">Falar com a empresa no WhatsApp</a>
+        <a class="btn btn-outline-primary mt-3" href="{{ url_nota_pdf }}">Baixar comprovante em PDF</a>
+        {% if pedido.status_pagamento == 'PENDENTE' %}
+          <form method="post" action="{{ url_reiniciar_pagamento }}" class="mt-3">
+            <button class="btn btn-outline-primary">Tentar pagamento novamente</button>
+          </form>
+        {% endif %}
+        <p class="text-muted small mt-3 mb-0">Guarde este codigo para acompanhar a preparacao e a entrega.</p>
+        <a class="btn btn-outline-secondary mt-3" href="{{ url_for('cliente.loja') }}">Voltar para o delivery</a>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  const pedidoId = {{ pedido.id }};
+  const urlStatus = {{ url_status|tojson }};
+  const acompanhamentoUrl = {{ url_acompanhamento|tojson }};
+  const notaPdfUrl = new URL({{ url_nota_pdf|tojson }}, window.location.origin).href;
+  const numeroWhatsapp = {{ whatsapp_empresa|tojson }};
+  const redirecionarAoWhatsapp = {{ 'true' if retorno_checkout else 'false' }};
+  const destinoWhatsapp = `https://wa.me/${numeroWhatsapp}?text=` + encodeURIComponent(
+    `Ola! Realizei o pagamento do pedido #${pedidoId}. Acompanhamento: ${acompanhamentoUrl}. Comprovante em PDF: ${notaPdfUrl}`
+  );
+  const ordemEtapas = ['FILA_DE_ESPERA', 'PREPARANDO', 'PRONTO', 'SAIU_PARA_ENTREGA', 'ENTREGUE'];
+  let redirecionado = false;
+
+  document.getElementById('botao-whatsapp').href = destinoWhatsapp;
+  document.getElementById('copiar-codigo').addEventListener('click', async () => {
+    const botao = document.getElementById('copiar-codigo');
+    try {
+      await navigator.clipboard.writeText(document.getElementById('codigo-acompanhamento').textContent);
+      botao.textContent = 'Copiado';
+    } catch (_) {
+      botao.textContent = 'Copie o codigo acima';
+    }
+  });
+
+  function atualizarEtapas(status) {
+    const indiceAtual = ordemEtapas.indexOf(status);
+    document.querySelectorAll('#etapas-entrega [data-status]').forEach((etapa, indice) => {
+      etapa.classList.toggle('text-bg-success', indiceAtual >= 0 && indice <= indiceAtual);
+      etapa.classList.toggle('text-bg-secondary', !(indiceAtual >= 0 && indice <= indiceAtual));
+    });
+  }
+
+  function mostrarPagamentoAprovado() {
+    document.getElementById('confirmacao').classList.remove('d-none');
+    document.getElementById('botao-whatsapp').classList.remove('d-none');
+    if (redirecionarAoWhatsapp && !redirecionado) {
+      redirecionado = true;
+      setTimeout(() => { window.location.href = destinoWhatsapp; }, 2500);
+    }
+  }
+
+  async function consultarStatus() {
+    try {
+      const resposta = await fetch(urlStatus, {cache: 'no-store'});
+      const dados = await resposta.json();
+      document.getElementById('status-pagamento').textContent = dados.status_pagamento;
+      document.getElementById('status-operacional').textContent = dados.nome_status_operacional;
+      atualizarEtapas(dados.status_operacional);
+      if (dados.status_pagamento === 'APROVADO') mostrarPagamentoAprovado();
+    } catch (_) {}
+  }
+
+  consultarStatus();
+  setInterval(consultarStatus, 5000);
+</script>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block title %}Venda #{{ venda.id }}{% endblock %}
+{% block content %}
+<div class="card shadow-sm"><div class="card-body p-4">
+  <h1 class="h3">Venda #{{ venda.id }}</h1>
+  <p><strong>Cliente:</strong> {{ venda.cliente }}</p><p><strong>Produto:</strong> {{ venda.produto }} &times; {{ venda.quantidade }}</p>
+  <p><strong>Total:</strong> R$ {{ '%.2f'|format(venda.valor_total) }}</p><p><strong>Status:</strong> {{ venda.status_pagamento }}</p>
+  {% if usuario %}<a class="btn btn-primary" href="{{ url_for('vendas.index') }}">Ver historico</a>{% else %}<a class="btn btn-primary" href="{{ url_for('vendas.inicio') }}">Pagina inicial</a>{% endif %}
+</div></div>
+{% endblock %}

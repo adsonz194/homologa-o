@@ -1,0 +1,44 @@
+# Credenciais e configurações locais
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials/
+secrets/
+deploy/sistemavenda.env
+
+# Dados locais e arquivos enviados por clientes
+*.db
+*.sqlite
+*.sqlite3
+instance/
+uploads/
+
+# Python e ambientes virtuais
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Logs e arquivos temporários
+*.log
+*.tmp
+*.bak
+*.swp
+
+# Ferramentas e sistema operacional
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

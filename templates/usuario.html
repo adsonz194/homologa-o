@@ -1,0 +1,5 @@
+{% extends 'base.html' %}
+{% block title %}Novo funcionario | Sistema de Vendas{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-md-7"><div class="card shadow-sm"><div class="card-body p-4"><h1 class="h3 mb-4">Cadastrar funcionario</h1><form method="post" class="row g-3"><div class="col-md-6"><label class="form-label">Nome</label><input class="form-control" name="nome" required></div><div class="col-md-6"><label class="form-label">Usuario</label><input class="form-control" name="usuario" pattern="[A-Za-z0-9_.-]{3,50}" required><div class="form-text">Use letras, numeros, ponto, hifen ou sublinhado.</div></div><div class="col-md-6"><label class="form-label">Senha inicial</label><input class="form-control" type="password" name="senha" minlength="12" required><div class="form-text">Minimo de 12 caracteres.</div></div><div class="col-12"><button class="btn btn-primary">Salvar funcionario</button> <a class="btn btn-outline-secondary" href="{{ url_for('auth.usuarios') }}">Cancelar</a></div></form></div></div></div></div>
+{% endblock %}

@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block title %}Funcionarios | Sistema de Vendas{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3"><div><h1 class="h3 mb-0">Dono e funcionarios</h1><small class="text-muted">Apenas o dono administra estes acessos.</small></div><a class="btn btn-primary" href="{{ url_for('auth.novo_usuario') }}">Novo funcionario</a></div>
+<div class="card shadow-sm"><div class="table-responsive"><table class="table table-hover mb-0"><thead><tr><th>Nome</th><th>Usuario</th><th>Perfil</th><th>Status</th></tr></thead><tbody>{% for conta in usuarios %}<tr><td>{{ conta.nome }}</td><td>{{ conta.usuario }}</td><td>{{ conta.papel }}</td><td>{{ 'Ativo' if conta.ativo else 'Inativo' }}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted py-4">Crie o primeiro acesso de dono pelo comando de configuracao.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

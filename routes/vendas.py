@@ -1,0 +1,60 @@
+from decimal import Decimal, InvalidOperation
+from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+from routes.auth import login_required
+from models import EstoqueInsuficiente, criar_venda, listar_vendas, obter_produto, obter_venda
+
+vendas_bp = Blueprint("vendas", __name__)
+FORMAS_PAGAMENTO = {"PIX", "CREDITO", "DEBITO"}
+
+@vendas_bp.get("/")
+def inicio():
+    return redirect(url_for("cliente.loja"))
+
+
+@vendas_bp.get("/painel/vendas")
+@login_required
+def index():
+    return render_template("index.html", vendas=listar_vendas(g.usuario["estabelecimento_id"]))
+
+@vendas_bp.route("/vendas/nova", methods=["GET", "POST"])
+@login_required
+def nova_venda():
+    if request.method == "GET":
+        return render_template("venda.html")
+    try:
+        cliente = request.form["cliente"].strip()
+        produto_id = int(request.form["produto_id"])
+        produto = obter_produto(produto_id, g.usuario["estabelecimento_id"])
+        if produto is None:
+            raise ValueError
+        quantidade = int(request.form["quantidade"])
+        valor = float(produto["valor_unitario"])
+        desconto = float(Decimal(request.form.get("desconto", "0").replace(",", ".")))
+        forma = request.form["forma_pagamento"]
+        if (
+            not cliente or quantidade <= 0 or valor <= 0 or desconto < 0
+            or desconto >= quantidade * valor or forma not in FORMAS_PAGAMENTO
+        ):
+            raise ValueError
+    except (KeyError, ValueError, InvalidOperation):
+        flash("Preencha valores válidos: o preço deve ser maior que zero e o desconto menor que o total.", "danger")
+        return render_template("venda.html"), 400
+    try:
+        venda_id = criar_venda(cliente, produto["descricao"], quantidade, valor, desconto, forma, produto_id, estabelecimento_id=g.usuario["estabelecimento_id"])
+    except EstoqueInsuficiente as erro:
+        flash(str(erro), "danger")
+        return render_template("venda.html"), 400
+    return render_template(
+        "iniciar_pagamento.html",
+        destino=url_for("pagamentos.criar_checkout", venda_id=venda_id),
+        titulo="Preparando o checkout",
+        descricao="Abrindo o ambiente seguro do Mercado Pago.",
+        auto_submit=True,
+    )
+
+@vendas_bp.get("/vendas/<int:venda_id>/sucesso")
+@login_required
+def sucesso(venda_id):
+    venda = obter_venda(venda_id, g.usuario["estabelecimento_id"])
+    if venda is None: return "Venda não encontrada", 404
+    return render_template("sucesso.html", venda=venda)

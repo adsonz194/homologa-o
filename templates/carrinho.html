@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block title %}Carrinho | Delivery{% endblock %}
+{% block content %}
+<div class="page-heading d-flex justify-content-between align-items-end gap-3"><div><h1>Seu carrinho</h1><p>Revise os itens antes de finalizar o pedido.</p></div><a class="btn btn-outline-primary" href="{{ url_for('cliente.loja') }}">Continuar comprando</a></div>
+{% if itens %}
+  <div class="row g-4">
+    <div class="col-lg-8"><div class="card shadow-sm"><div class="table-responsive"><table class="table align-middle">
+      <thead><tr><th>Produto</th><th>Valor</th><th>Quantidade</th><th>Subtotal</th><th></th></tr></thead>
+      <tbody>{% for item in itens %}<tr>
+        <td><strong>{{ item.produto.descricao }}</strong><br><small class="text-muted">Codigo {{ item.produto.codigo_interno }}</small></td>
+        <td>R$ {{ '%.2f'|format(item.produto.valor_unitario) }}</td>
+        <td><form method="post" action="{{ url_for('cliente.atualizar_carrinho', produto_id=item.produto.id) }}" class="d-flex gap-2"><input class="form-control" type="number" name="quantidade" min="0" max="{{ item.produto.estoque }}" value="{{ item.quantidade }}" aria-label="Quantidade" style="max-width: 82px"><button class="btn btn-outline-primary btn-sm">Atualizar</button></form></td>
+        <td><strong>R$ {{ '%.2f'|format(item.subtotal) }}</strong></td>
+        <td><form method="post" action="{{ url_for('cliente.atualizar_carrinho', produto_id=item.produto.id) }}"><input type="hidden" name="quantidade" value="0"><button class="btn btn-outline-danger btn-sm">Remover</button></form></td>
+      </tr>{% endfor %}</tbody>
+    </table></div></div></div>
+    <aside class="col-lg-4"><div class="card summary-card"><div class="card-body"><h2 class="h5 summary-title mb-4">Resumo do pedido</h2><div class="d-flex justify-content-between summary-total"><span>Total</span><span>R$ {{ '%.2f'|format(total) }}</span></div><a class="btn btn-success w-100 mt-4" href="{{ url_for('cliente.finalizar') }}">Finalizar pedido</a></div></div></aside>
+  </div>
+{% else %}
+  <div class="card"><div class="empty-state"><h2 class="h5">Seu carrinho esta vazio</h2><p>Adicione produtos para continuar.</p><a class="btn btn-primary mt-2" href="{{ url_for('cliente.loja') }}">Ver cardapio</a></div></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}{{ estabelecimento.nome }} | Delivery{% endblock %}
+{% block content %}
+<section class="hero-delivery d-md-flex justify-content-between align-items-center gap-4">
+  <div>
+    <div class="hero-kicker">Delivery online</div>
+    <h1>{{ estabelecimento.nome }}</h1>
+    <p>Escolha seus favoritos e receba onde estiver.</p>
+  </div>
+  <a class="btn btn-lg text-nowrap" href="{{ url_for('cliente.carrinho') }}">Ver carrinho{% if quantidade_carrinho %} ({{ quantidade_carrinho }}){% endif %}</a>
+</section>
+
+<div class="page-heading d-flex flex-wrap justify-content-between align-items-end gap-2">
+  <div><h2>Cardapio</h2><p>Itens disponiveis para pedir agora.</p></div>
+  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('cliente.acompanhar_pedido') }}">Acompanhar pedido</a>
+</div>
+
+<div class="row g-4">
+  {% for produto in produtos %}
+    <div class="col-sm-6 col-lg-4"><article class="card product-card shadow-sm"><div class="card-body">
+      <div class="d-flex justify-content-between gap-2 align-items-start"><h3 class="h5 fw-bold mb-2">{{ produto.descricao }}</h3><span class="badge text-bg-light border">Disponivel</span></div>
+      <p class="product-meta mb-1">Codigo {{ produto.codigo_interno }}{% if produto.ean %} &middot; EAN {{ produto.ean }}{% endif %}</p>
+      <p class="product-price">R$ {{ '%.2f'|format(produto.valor_unitario) }}</p>
+      <p class="stock-label mb-3">{{ produto.estoque }} unidade(s) em estoque</p>
+      <form method="post" action="{{ url_for('cliente.adicionar_ao_carrinho', produto_id=produto.id) }}" class="d-flex gap-2">
+        <input class="form-control" type="number" name="quantidade" min="1" max="{{ produto.estoque }}" value="1" aria-label="Quantidade de {{ produto.descricao }}">
+        <button class="btn btn-success text-nowrap">Adicionar</button>
+      </form>
+    </div></article></div>
+  {% else %}
+    <div class="col-12"><div class="card"><div class="empty-state"><h2 class="h5">Nenhum item disponivel agora</h2><p class="mb-0">Volte em alguns instantes para conferir o cardapio.</p></div></div></div>
+  {% endfor %}
+</div>
+{% endblock %}

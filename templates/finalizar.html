@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block title %}Finalizar pedido | Delivery{% endblock %}
+{% block content %}
+<div class="page-heading"><h1>Finalizar pedido</h1><p>Informe os dados de entrega e escolha como deseja pagar.</p></div>
+<div class="row g-4"><div class="col-lg-7"><div class="card shadow-sm"><div class="card-body p-md-4">
+  <form method="post" class="row g-3">
+    <div class="col-12"><label class="form-label">Nome</label><input class="form-control" name="cliente" minlength="2" maxlength="100" required autocomplete="name" placeholder="Como devemos chamar voce?"></div>
+    <div class="col-md-6"><label class="form-label">Telefone / WhatsApp</label><input class="form-control" name="telefone" inputmode="tel" maxlength="20" required autocomplete="tel" placeholder="(00) 00000-0000"></div>
+    <div class="col-12"><label class="form-label">Endereco completo</label><textarea class="form-control" name="endereco" rows="4" minlength="8" maxlength="300" placeholder="Rua, numero, bairro e complemento" required></textarea></div>
+    <div class="col-12"><label class="form-label">Forma de pagamento</label><select class="form-select" name="forma_pagamento" required><option value="PIX">Pix</option><option value="CREDITO">Cartao de credito</option><option value="DEBITO">Cartao de debito</option></select><div class="form-text">O pagamento sera concluido no ambiente seguro do Mercado Pago.</div></div>
+    <div class="col-12"><button class="btn btn-success w-100">Ir para pagamento seguro</button></div>
+  </form>
+</div></div></div>
+<aside class="col-lg-5"><div class="card summary-card"><div class="card-body"><h2 class="h5 summary-title mb-4">Resumo</h2>{% for item in itens %}<div class="d-flex justify-content-between gap-3 small mb-3"><span>{{ item.quantidade }} &times; {{ item.produto.descricao }}</span><strong class="text-nowrap">R$ {{ '%.2f'|format(item.subtotal) }}</strong></div>{% endfor %}{% if estabelecimento.valor_entrega %}<div class="d-flex justify-content-between small mb-3"><span>Taxa de entrega</span><strong>R$ {{ '%.2f'|format(estabelecimento.valor_entrega) }}</strong></div>{% endif %}<div class="d-flex justify-content-between summary-total"><span>Total</span><span>R$ {{ '%.2f'|format(total) }}</span></div></div></div></aside></div>
+{% endblock %}
