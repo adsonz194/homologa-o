@@ -71,7 +71,7 @@ def owner_required(view):
             return redirect(url_for("auth.entrar", proximo=request.path))
         if g.usuario["papel"] != "DONO":
             flash("Apenas o dono pode acessar esta area.", "danger")
-            return redirect(url_for("vendas.index"))
+            return redirect(url_for("pedidos.index"))
         return view(*args, **kwargs)
     return protegido
 
@@ -79,7 +79,7 @@ def owner_required(view):
 @auth_bp.route("/entrar", methods=["GET", "POST"])
 def entrar():
     if g.usuario is not None:
-        return redirect(url_for("vendas.index"))
+        return redirect(url_for("vendas.index") if g.usuario["papel"] == "DONO" else url_for("pedidos.index"))
     if request.method == "POST":
         endereco_ip = request.remote_addr or "desconhecido"
         if quantidade_tentativas_login(
@@ -96,7 +96,7 @@ def entrar():
             session["usuario_id"] = conta["id"]
             proximo = request.form.get("proximo", "")
             if not proximo.startswith("/") or proximo.startswith("//"):
-                proximo = url_for("vendas.index")
+                proximo = url_for("vendas.index") if conta["papel"] == "DONO" else url_for("pedidos.index")
             return redirect(proximo)
         registrar_tentativa_login(endereco_ip)
         flash("Usuario ou senha invalidos.", "danger")

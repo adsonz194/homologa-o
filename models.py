@@ -408,6 +408,17 @@ def listar_pedidos(estabelecimento_id):
     ).fetchall()
 
 
+def listar_pedidos_aprovados_apos(estabelecimento_id, depois_id):
+    """Pedidos aprovados depois do ultimo ID visto pelo painel."""
+    return get_db().execute(
+        """SELECT id, cliente, valor_total, local_entrega
+           FROM pedidos
+           WHERE estabelecimento_id = ? AND status_pagamento = 'APROVADO' AND id > ?
+           ORDER BY id ASC LIMIT 30""",
+        (estabelecimento_id, depois_id),
+    ).fetchall()
+
+
 def atualizar_preferencia_pedido(pedido_id, preference_id):
     db = get_db()
     db.execute("UPDATE pedidos SET preference_id = ? WHERE id = ?", (preference_id, pedido_id))

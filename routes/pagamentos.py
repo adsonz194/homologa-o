@@ -18,7 +18,7 @@ from models import (
     obter_url_publica_estabelecimento,
     obter_pedido,
 )
-from routes.auth import login_required
+from routes.auth import owner_required
 
 pagamentos_bp = Blueprint("pagamentos", __name__)
 API_URL = "https://api.mercadopago.com"
@@ -195,7 +195,7 @@ def reembolsar_pedido(pedido):
 
 
 @pagamentos_bp.post("/pagamentos/checkout/<int:venda_id>")
-@login_required
+@owner_required
 def criar_checkout(venda_id):
     from models import obter_venda
     venda = obter_venda(venda_id, g.usuario["estabelecimento_id"])

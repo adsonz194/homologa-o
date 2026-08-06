@@ -4,7 +4,7 @@ import sqlite3
 from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
 
 from models import atualizar_produto, buscar_produtos, criar_produto, listar_produtos, obter_produto
-from routes.auth import login_required, owner_required
+from routes.auth import owner_required
 
 produtos_bp = Blueprint("produtos", __name__)
 
@@ -65,7 +65,7 @@ def editar(produto_id):
 
 
 @produtos_bp.get("/api/produtos/buscar")
-@login_required
+@owner_required
 def buscar():
     consulta = request.args.get("q", "").strip()
     if not consulta:
