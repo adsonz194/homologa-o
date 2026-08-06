@@ -81,6 +81,7 @@ def init_db():
         cliente TEXT NOT NULL,
         telefone TEXT NOT NULL,
         endereco TEXT NOT NULL,
+        local_entrega TEXT NOT NULL DEFAULT '',
         forma_pagamento TEXT NOT NULL,
         status_pagamento TEXT NOT NULL DEFAULT 'PENDENTE',
         status_operacional TEXT NOT NULL DEFAULT 'PENDENTE',
@@ -176,6 +177,8 @@ def init_db():
         db.execute("ALTER TABLE pedidos ADD COLUMN codigo_acompanhamento TEXT")
     if "valor_entrega" not in colunas_pedidos:
         db.execute("ALTER TABLE pedidos ADD COLUMN valor_entrega REAL NOT NULL DEFAULT 0")
+    if "local_entrega" not in colunas_pedidos:
+        db.execute("ALTER TABLE pedidos ADD COLUMN local_entrega TEXT NOT NULL DEFAULT ''")
     if "estabelecimento_id" not in colunas_pedidos:
         db.execute("ALTER TABLE pedidos ADD COLUMN estabelecimento_id INTEGER")
     colunas_usuarios = {coluna["name"] for coluna in db.execute("PRAGMA table_info(usuarios)")}

@@ -7,6 +7,7 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="col-12"><label class="form-label">Nome</label><input class="form-control" name="cliente" minlength="2" maxlength="100" required autocomplete="name" placeholder="Como devemos chamar voce?"></div>
     <div class="col-md-6"><label class="form-label">Telefone / WhatsApp</label><input class="form-control" name="telefone" inputmode="tel" maxlength="20" required autocomplete="tel" placeholder="(00) 00000-0000"></div>
+    <div class="col-md-6"><label class="form-label">Local de entrega</label><select class="form-select" name="local_entrega" required><option value="" selected disabled>Selecione seu local</option>{% for codigo, nome, horario in locais_entrega %}<option value="{{ codigo }}">{{ nome }} - até {{ horario }}</option>{% endfor %}</select></div>
     <div class="col-12"><label class="form-label">Endereco completo</label><textarea class="form-control" name="endereco" rows="4" minlength="8" maxlength="300" placeholder="Rua, numero, bairro e complemento" required></textarea></div>
     <div class="col-12"><label class="form-label">Forma de pagamento</label><select class="form-select" name="forma_pagamento" required><option value="PIX">Pix</option><option value="CREDITO">Cartao de credito</option><option value="DEBITO">Cartao de debito</option></select><div class="form-text">O pagamento sera concluido no ambiente seguro do Mercado Pago.</div></div>
     <div class="col-12"><button class="btn btn-success w-100">Ir para pagamento seguro</button></div>

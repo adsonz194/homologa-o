@@ -141,7 +141,8 @@ def configuracoes():
                 or endereco.scheme != "https"
                 or not endereco.hostname
                 or not dias
-                or horario_abertura >= horario_encerramento
+                or horario_abertura == horario_encerramento
+                or (horario_encerramento != "00:00" and horario_abertura > horario_encerramento)
                 or len(access_token) > 500
                 or len(webhook_secret) > 500
             ):

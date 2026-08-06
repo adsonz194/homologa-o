@@ -73,7 +73,7 @@ def gerar_comprovante_pedido_pdf(pedido, itens, estabelecimento):
 
     informacoes = [
         [Paragraph("<b>Cliente</b><br/>" + texto(pedido["cliente"]), corpo), Paragraph("<b>Telefone</b><br/>" + texto(pedido["telefone"]), corpo)],
-        [Paragraph("<b>Endereco de entrega</b><br/>" + texto(pedido["endereco"]), corpo), Paragraph("<b>Pagamento</b><br/>" + texto(pedido["forma_pagamento"]), corpo)],
+        [Paragraph("<b>Local e endereco de entrega</b><br/>" + texto(pedido["local_entrega"] or "Local não informado") + "<br/>" + texto(pedido["endereco"]), corpo), Paragraph("<b>Pagamento</b><br/>" + texto(pedido["forma_pagamento"]), corpo)],
         [Paragraph("<b>Status do pagamento</b><br/>" + texto(pedido["status_pagamento"]), corpo), Paragraph("<b>Status do pedido</b><br/>" + texto(pedido["status_operacional"]), corpo)],
     ]
     tabela_info = Table(informacoes, colWidths=[87 * mm, 87 * mm], hAlign="LEFT")

@@ -4,6 +4,7 @@ from flask import Blueprint, current_app, flash, jsonify, redirect, render_templ
 
 from models import (
     EstoqueInsuficiente,
+    LOCAIS_ENTREGA,
     criar_pedido,
     detalhes_carrinho,
     itens_pedido,
@@ -15,6 +16,8 @@ from models import (
     obter_pedido,
     obter_pedido_por_codigo,
     obter_produto,
+    local_entrega_por_codigo,
+    status_entrega_local,
     status_funcionamento_estabelecimento,
 )
 from nota_pdf import gerar_comprovante_pedido_pdf
@@ -59,6 +62,7 @@ def renderizar_loja():
         quantidade_carrinho=sum(carrinho_atual().values()),
         estabelecimento=estabelecimento,
         funcionamento=status_funcionamento_estabelecimento(estabelecimento),
+        locais_entrega=LOCAIS_ENTREGA,
     )
 
 
@@ -158,23 +162,30 @@ def finalizar():
         return redirect(url_for("cliente.loja"))
     total = sum(item["subtotal"] for item in itens) + estabelecimento["valor_entrega"]
     if request.method == "GET":
-        return render_template("finalizar.html", itens=itens, total=total, estabelecimento=estabelecimento)
+        return render_template("finalizar.html", itens=itens, total=total, estabelecimento=estabelecimento, locais_entrega=LOCAIS_ENTREGA)
     cliente = request.form.get("cliente", "").strip()
     telefone = request.form.get("telefone", "").strip()
     endereco = request.form.get("endereco", "").strip()
+    codigo_local = request.form.get("local_entrega", "")
+    local = local_entrega_por_codigo(codigo_local)
     forma_pagamento = request.form.get("forma_pagamento", "")
     telefone_numeros = "".join(caractere for caractere in telefone if caractere.isdigit())
     if (
         not 2 <= len(cliente) <= 100
         or not 8 <= len(telefone_numeros) <= 15
         or not 8 <= len(endereco) <= 300
+        or local is None
         or forma_pagamento not in FORMAS_PAGAMENTO
     ):
-        flash("Confira nome, telefone, endereco e forma de pagamento.", "danger")
-        return render_template("finalizar.html", itens=itens, total=total, estabelecimento=estabelecimento), 400
+        flash("Confira nome, local de entrega, telefone, endereco e forma de pagamento.", "danger")
+        return render_template("finalizar.html", itens=itens, total=total, estabelecimento=estabelecimento, locais_entrega=LOCAIS_ENTREGA), 400
+    funcionamento_local = status_entrega_local(estabelecimento, codigo_local)
+    if not funcionamento_local["aberto"]:
+        flash(funcionamento_local["mensagem"], "warning")
+        return render_template("finalizar.html", itens=itens, total=total, estabelecimento=estabelecimento, locais_entrega=LOCAIS_ENTREGA), 400
     try:
         pedido_id = criar_pedido(
-            cliente, telefone, endereco, "", forma_pagamento, carrinho_atual(), estabelecimento["id"]
+            cliente, telefone, endereco, local[1], "", forma_pagamento, carrinho_atual(), estabelecimento["id"]
         )
     except EstoqueInsuficiente as erro:
         flash(str(erro), "danger")

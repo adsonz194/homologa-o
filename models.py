@@ -19,6 +19,11 @@ DIAS_SEMANA = (
     (0, "Segunda-feira"), (1, "Terca-feira"), (2, "Quarta-feira"),
     (3, "Quinta-feira"), (4, "Sexta-feira"), (5, "Sabado"), (6, "Domingo"),
 )
+LOCAIS_ENTREGA = (
+    ("IMBASSAI", "Imbassai", "00:00"),
+    ("MARBELO", "Marbelo", "00:00"),
+    ("MARASU", "Marasu", "20:00"),
+)
 
 
 def data_hora_loja():
@@ -47,9 +52,34 @@ def status_funcionamento_estabelecimento(estabelecimento, agora=None):
     hora_atual = agora.timetz().replace(tzinfo=None)
     if hora_atual < abertura:
         return {"aberto": False, "fechado_manual": False, "horario": horario, "mensagem": f"O delivery abre hoje às {abertura.strftime('%H:%M')}."}
-    if hora_atual >= encerramento:
+    # 00:00 representa a meia-noite do fim do dia, permitindo que a loja
+    # trabalhe, por exemplo, das 08:00 até 00:00.
+    if encerramento != time(0) and hora_atual >= encerramento:
         return {"aberto": False, "fechado_manual": False, "horario": horario, "mensagem": f"O delivery encerrou hoje às {encerramento.strftime('%H:%M')}."}
     return {"aberto": True, "fechado_manual": False, "horario": horario, "mensagem": f"Aberto agora. Atendimento até {encerramento.strftime('%H:%M')}."}
+
+
+def local_entrega_por_codigo(codigo):
+    return next((local for local in LOCAIS_ENTREGA if local[0] == codigo), None)
+
+
+def status_entrega_local(estabelecimento, codigo_local, agora=None):
+    """Combina a agenda geral com o limite específico de cada local."""
+    status_loja = status_funcionamento_estabelecimento(estabelecimento, agora)
+    if not status_loja["aberto"]:
+        return status_loja
+    local = local_entrega_por_codigo(codigo_local)
+    if local is None:
+        return {"aberto": False, "mensagem": "Este local não é atendido pelo delivery."}
+    agora = agora or data_hora_loja()
+    limite = time.fromisoformat(local[2])
+    hora_atual = agora.timetz().replace(tzinfo=None)
+    if limite != time(0) and hora_atual >= limite:
+        return {
+            "aberto": False,
+            "mensagem": f"Não fazemos mais entregas em {local[1]} hoje. Atendimento até {local[2]}.",
+        }
+    return {"aberto": True, "mensagem": f"Entrega em {local[1]} disponível até {local[2]}."}
 
 
 def obter_estabelecimento(estabelecimento_id):
@@ -320,7 +350,7 @@ def detalhes_carrinho(carrinho, estabelecimento_id):
     return itens
 
 
-def criar_pedido(cliente, telefone, endereco, email, forma_pagamento, carrinho, estabelecimento_id):
+def criar_pedido(cliente, telefone, endereco, local_entrega, email, forma_pagamento, carrinho, estabelecimento_id):
     itens = detalhes_carrinho(carrinho, estabelecimento_id)
     if not itens:
         raise EstoqueInsuficiente("Carrinho vazio.")
@@ -340,10 +370,10 @@ def criar_pedido(cliente, telefone, endereco, email, forma_pagamento, carrinho, 
             total += item["subtotal"]
         cursor = db.execute(
             """INSERT INTO pedidos
-               (cliente, telefone, endereco, email, forma_pagamento, valor_total, valor_entrega,
+               (cliente, telefone, endereco, local_entrega, email, forma_pagamento, valor_total, valor_entrega,
                 codigo_acompanhamento, estabelecimento_id, estoque_reservado)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
-            (cliente, telefone, endereco, email, forma_pagamento, total, valor_entrega, gerar_codigo_acompanhamento(db), estabelecimento_id),
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
+            (cliente, telefone, endereco, local_entrega, email, forma_pagamento, total, valor_entrega, gerar_codigo_acompanhamento(db), estabelecimento_id),
         )
         pedido_id = cursor.lastrowid
         for item in itens:
