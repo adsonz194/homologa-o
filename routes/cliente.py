@@ -10,6 +10,8 @@ from models import (
     listar_produtos_disponiveis,
     obter_estabelecimento,
     obter_estabelecimento_por_slug,
+    obter_url_publica_estabelecimento,
+    obter_whatsapp_estabelecimento,
     obter_pedido,
     obter_pedido_por_codigo,
     obter_produto,
@@ -97,8 +99,11 @@ def carrinho():
     if estabelecimento is None:
         return "Delivery indisponivel", 503
     itens = detalhes_carrinho(carrinho_atual(), estabelecimento["id"])
-    total = sum(item["subtotal"] for item in itens)
-    return render_template("carrinho.html", itens=itens, total=total, estabelecimento=estabelecimento)
+    subtotal = sum(item["subtotal"] for item in itens)
+    total = subtotal + estabelecimento["valor_entrega"] if itens else subtotal
+    return render_template(
+        "carrinho.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento
+    )
 
 
 @cliente_bp.post("/cliente/carrinho/atualizar/<int:produto_id>")
@@ -189,10 +194,13 @@ def renderizar_pedido(pedido_atual, retorno_checkout=False):
         codigo_acompanhamento=codigo,
         nome_status_operacional=STATUS_OPERACIONAL_NOMES.get(pedido_atual["status_operacional"], "Em atualizacao"),
         url_status=url_for("cliente.status_pedido", codigo=codigo),
-        url_acompanhamento=f"{current_app.config['BASE_URL']}{url_for('cliente.pedido', codigo=codigo)}",
+        url_acompanhamento=(
+            f"{obter_url_publica_estabelecimento(pedido_atual['estabelecimento_id'])}"
+            f"{url_for('cliente.pedido', codigo=codigo)}"
+        ),
         url_reiniciar_pagamento=url_for("cliente.reiniciar_pagamento", codigo=codigo),
         url_nota_pdf=url_for("cliente.nota_pdf", codigo=codigo),
-        whatsapp_empresa=current_app.config["WHATSAPP_EMPRESA"],
+        whatsapp_empresa=obter_whatsapp_estabelecimento(pedido_atual["estabelecimento_id"]),
         retorno_checkout=retorno_checkout,
     )
 

@@ -4,7 +4,12 @@ import hmac
 import mercadopago
 from flask import Blueprint, current_app, jsonify, request
 
-from models import atualizar_pagamento, atualizar_pagamento_pedido
+from models import (
+    atualizar_pagamento,
+    atualizar_pagamento_pedido,
+    obter_segredo_webhook_mercadopago,
+    obter_token_mercadopago,
+)
 from routes.pagamentos import STATUS_PAGAMENTO
 
 webhook_bp = Blueprint("webhook", __name__)
@@ -12,7 +17,7 @@ webhook_bp = Blueprint("webhook", __name__)
 
 def assinatura_valida():
     """Valida a assinatura HMAC do webhook quando ela esta configurada."""
-    segredo = current_app.config["MERCADOPAGO_WEBHOOK_SECRET"]
+    segredo = obter_segredo_webhook_mercadopago()
     if not segredo:
         return True
     assinatura = request.headers.get("x-signature", "")
@@ -43,7 +48,7 @@ def receber_webhook():
     recurso_id = dados.get("id") or payload.get("id")
     if not recurso_id or tipo != "payment":
         return jsonify(recebido=True), 200
-    token = current_app.config["MERCADOPAGO_ACCESS_TOKEN"]
+    token = obter_token_mercadopago()
     if not token:
         return jsonify(erro="Token nao configurado"), 500
     try:

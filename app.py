@@ -19,10 +19,6 @@ def create_app():
     ambiente_producao = app.config["BASE_URL"].startswith("https://")
     if ambiente_producao and app.config["SECRET_KEY"] == "desenvolvimento-altere-esta-chave":
         raise RuntimeError("Defina uma SECRET_KEY exclusiva no arquivo .env de producao.")
-    if ambiente_producao and not app.config["MERCADOPAGO_ACCESS_TOKEN"]:
-        app.logger.error("Ambiente de producao sem MERCADOPAGO_ACCESS_TOKEN configurado.")
-    if ambiente_producao and not app.config["MERCADOPAGO_WEBHOOK_SECRET"]:
-        app.logger.warning("Ambiente de producao sem MERCADOPAGO_WEBHOOK_SECRET; configure a assinatura secreta do webhook.")
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -32,6 +28,16 @@ def create_app():
     if ambiente_producao and not app.config["SESSION_COOKIE_SECURE"]:
         app.logger.warning("SESSION_COOKIE_SECURE esta desativado; ative-o na VPS com HTTPS.")
     init_database(app)
+    # As credenciais podem vir do ambiente do Render ou da area protegida de
+    # configuracoes. A verificacao acontece depois de abrir o banco para cobrir
+    # os dois casos sem gerar alertas falsos no log.
+    if ambiente_producao:
+        from models import obter_segredo_webhook_mercadopago, obter_token_mercadopago
+        with app.app_context():
+            if not obter_token_mercadopago():
+                app.logger.error("Ambiente de producao sem Access Token do Mercado Pago configurado.")
+            if not obter_segredo_webhook_mercadopago():
+                app.logger.warning("Ambiente de producao sem assinatura secreta do webhook Mercado Pago.")
     app.register_blueprint(auth_bp)
     app.register_blueprint(cliente_bp)
     app.register_blueprint(vendas_bp)

@@ -12,6 +12,12 @@ Aplicacao Flask para cardapio, pedidos, estoque, painel interno e Checkout Pro d
 
 O painel e acessado em `/entrar`. O dono cadastra os produtos e funcionarios; pedidos e vendas podem ser operados por funcionarios autenticados.
 
+O dono encontra a aba **Configuracoes** apos entrar no painel. Nela, pode
+definir WhatsApp, URL publica, taxa de entrega e as credenciais de producao do
+Mercado Pago. Os segredos salvos por essa tela sao cifrados e nunca voltam a
+ser exibidos no navegador. A taxa inicial e R$ 6,00 por pedido e aparece no
+carrinho antes do cliente finalizar.
+
 ## Executar localmente
 
 ```powershell

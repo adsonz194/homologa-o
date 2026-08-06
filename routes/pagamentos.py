@@ -13,6 +13,8 @@ from models import (
     atualizar_preferencia,
     atualizar_preferencia_pedido,
     itens_pedido,
+    obter_token_mercadopago,
+    obter_url_publica_estabelecimento,
     obter_pedido,
 )
 from routes.auth import login_required
@@ -42,8 +44,8 @@ def url_publica_https(url):
     return endereco.scheme == "https" and endereco.hostname not in {None, "localhost", "127.0.0.1", "::1"}
 
 
-def adicionar_urls(preference, url_retorno):
-    base_url = current_app.config["BASE_URL"]
+def adicionar_urls(preference, url_retorno, estabelecimento_id=None):
+    base_url = obter_url_publica_estabelecimento(estabelecimento_id)
     if url_publica_https(base_url):
         preference.update({
             "back_urls": {"success": url_retorno, "failure": url_retorno, "pending": url_retorno},
@@ -54,8 +56,8 @@ def adicionar_urls(preference, url_retorno):
         current_app.logger.info("Checkout em modo local: retorno automatico e webhook aguardam BASE_URL HTTPS publica.")
 
 
-def requisicao_api(metodo, caminho, corpo=None):
-    token = current_app.config["MERCADOPAGO_ACCESS_TOKEN"]
+def requisicao_api(metodo, caminho, corpo=None, estabelecimento_id=None):
+    token = obter_token_mercadopago(estabelecimento_id)
     if not token:
         raise MercadoPagoError(0, {"message": "Token do Mercado Pago nao configurado"})
     dados = json.dumps(corpo).encode("utf-8") if corpo is not None else None
@@ -80,8 +82,8 @@ def requisicao_api(metodo, caminho, corpo=None):
         raise MercadoPagoError(0, {"message": f"Falha de rede: {erro.reason}"}) from erro
 
 
-def criar_preferencia(preference):
-    token = current_app.config["MERCADOPAGO_ACCESS_TOKEN"]
+def criar_preferencia(preference, estabelecimento_id=None):
+    token = obter_token_mercadopago(estabelecimento_id)
     if not token:
         raise MercadoPagoError(0, {"message": "Token do Mercado Pago nao configurado"})
     resposta = mercadopago.SDK(token).preference().create(preference)
@@ -124,7 +126,7 @@ def sincronizar_pagamento_pedido(pedido_id, payment_id):
     pedido = obter_pedido(pedido_id)
     if pedido is None or not payment_id:
         return None
-    token = current_app.config["MERCADOPAGO_ACCESS_TOKEN"]
+    token = obter_token_mercadopago(pedido["estabelecimento_id"])
     if not token:
         return None
     resposta = mercadopago.SDK(token).payment().get(payment_id)
@@ -140,14 +142,14 @@ def sincronizar_pagamento_pedido(pedido_id, payment_id):
 
 def cancelar_cobranca_pedido(pedido):
     if pedido["mercadopago_order_id"]:
-        requisicao_api("POST", f"/v1/orders/{pedido['mercadopago_order_id']}/cancel", {})
+        requisicao_api("POST", f"/v1/orders/{pedido['mercadopago_order_id']}/cancel", {}, pedido["estabelecimento_id"])
 
 
 def reembolsar_pedido(pedido):
     if pedido["mercadopago_order_id"]:
-        return requisicao_api("POST", f"/v1/orders/{pedido['mercadopago_order_id']}/refund", {})
+        return requisicao_api("POST", f"/v1/orders/{pedido['mercadopago_order_id']}/refund", {}, pedido["estabelecimento_id"])
     if pedido["payment_id"]:
-        return requisicao_api("POST", f"/v1/payments/{pedido['payment_id']}/refunds", {})
+        return requisicao_api("POST", f"/v1/payments/{pedido['payment_id']}/refunds", {}, pedido["estabelecimento_id"])
     raise MercadoPagoError(0, {"message": "Identificador de pagamento indisponivel para estorno"})
 
 
@@ -167,9 +169,10 @@ def criar_checkout(venda_id):
     }
     if venda["forma_pagamento"] in {"PIX", "CREDITO", "DEBITO"}:
         preference["payment_methods"] = configuracao_pagamento(venda["forma_pagamento"])
-    adicionar_urls(preference, f"{current_app.config['BASE_URL']}/cliente")
+    base_url = obter_url_publica_estabelecimento(g.usuario["estabelecimento_id"])
+    adicionar_urls(preference, f"{base_url}/cliente", g.usuario["estabelecimento_id"])
     try:
-        preference_id, checkout_url = criar_preferencia(preference)
+        preference_id, checkout_url = criar_preferencia(preference, g.usuario["estabelecimento_id"])
         atualizar_preferencia(venda_id, preference_id)
         return redirect(checkout_url)
     except MercadoPagoError as erro:
@@ -198,9 +201,14 @@ def criar_checkout_pedido(pedido_id):
     }
     if pedido["valor_entrega"] > 0:
         preference["items"].append({"title": "Taxa de entrega", "quantity": 1, "unit_price": float(pedido["valor_entrega"]), "currency_id": "BRL"})
-    adicionar_urls(preference, f"{current_app.config['BASE_URL']}/cliente/retorno/{pedido['codigo_acompanhamento']}")
+    base_url = obter_url_publica_estabelecimento(pedido["estabelecimento_id"])
+    adicionar_urls(
+        preference,
+        f"{base_url}/cliente/retorno/{pedido['codigo_acompanhamento']}",
+        pedido["estabelecimento_id"],
+    )
     try:
-        preference_id, checkout_url = criar_preferencia(preference)
+        preference_id, checkout_url = criar_preferencia(preference, pedido["estabelecimento_id"])
         atualizar_preferencia_pedido(pedido_id, preference_id)
         session.pop("pedido_pagamento_pendente", None)
         return redirect(checkout_url)

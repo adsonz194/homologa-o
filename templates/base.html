@@ -20,6 +20,7 @@
           {% if usuario.papel == 'DONO' %}
             <a class="btn btn-outline-light btn-sm" href="{{ url_for('produtos.index') }}">Produtos</a>
             <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.usuarios') }}">Funcionarios</a>
+            <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.configuracoes') }}">Configuracoes</a>
           {% endif %}
           <span class="user-label d-none d-lg-inline">{{ usuario.nome }} &middot; {{ usuario.papel|lower }}</span>
           <form method="post" action="{{ url_for('auth.sair') }}"><button class="btn btn-light btn-sm">Sair</button></form>

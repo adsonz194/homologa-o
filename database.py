@@ -36,7 +36,8 @@ def init_db():
         slug TEXT NOT NULL UNIQUE COLLATE NOCASE,
         telefone TEXT NOT NULL DEFAULT '',
         whatsapp TEXT NOT NULL DEFAULT '',
-        valor_entrega REAL NOT NULL DEFAULT 0 CHECK(valor_entrega >= 0),
+        valor_entrega REAL NOT NULL DEFAULT 6 CHECK(valor_entrega >= 0),
+        url_publica TEXT NOT NULL DEFAULT '',
         mercadopago_token_criptografado TEXT,
         webhook_secret_criptografado TEXT,
         status_plano TEXT NOT NULL DEFAULT 'ATIVO' CHECK(status_plano IN ('PENDENTE', 'ATIVO', 'EXPIRADO', 'CANCELADO')),
@@ -115,6 +116,17 @@ def init_db():
         estabelecimento_padrao_id = cursor.lastrowid
     else:
         estabelecimento_padrao_id = estabelecimento_padrao["id"]
+    colunas_estabelecimentos = {
+        coluna["name"] for coluna in db.execute("PRAGMA table_info(estabelecimentos)")
+    }
+    if "url_publica" not in colunas_estabelecimentos:
+        db.execute("ALTER TABLE estabelecimentos ADD COLUMN url_publica TEXT NOT NULL DEFAULT ''")
+        # Migracao unica da base anterior, cuja taxa padrao era zero. Depois
+        # disso, o dono pode inclusive configurar entrega gratuita (R$ 0,00).
+        db.execute(
+            "UPDATE estabelecimentos SET valor_entrega = 6 WHERE id = ? AND valor_entrega = 0",
+            (estabelecimento_padrao_id,),
+        )
     colunas_vendas = {coluna["name"] for coluna in db.execute("PRAGMA table_info(vendas)")}
     if "produto_id" not in colunas_vendas:
         db.execute("ALTER TABLE vendas ADD COLUMN produto_id INTEGER")

@@ -1,3 +1,10 @@
+import base64
+import hashlib
+from urllib.parse import urlparse
+
+from cryptography.fernet import Fernet, InvalidToken
+from flask import current_app
+
 from database import gerar_codigo_acompanhamento, get_db
 
 
@@ -16,6 +23,97 @@ def obter_estabelecimento_por_slug(slug):
     return get_db().execute(
         "SELECT * FROM estabelecimentos WHERE slug = ? COLLATE NOCASE", (slug,)
     ).fetchone()
+
+
+def _estabelecimento_integracao(estabelecimento_id=None):
+    if estabelecimento_id is not None:
+        return obter_estabelecimento(estabelecimento_id)
+    return obter_estabelecimento_por_slug(current_app.config["ESTABELECIMENTO_PADRAO_SLUG"])
+
+
+def _chave_fernet():
+    """Retorna uma chave estavel para os segredos salvos pelo painel.
+
+    CONFIG_ENCRYPTION_KEY permite trocar a SECRET_KEY sem invalidar os
+    segredos. Na ausencia dela, a SECRET_KEY ja obrigatoria em producao e
+    usada para derivar uma chave Fernet valida.
+    """
+    chave = current_app.config["CONFIG_ENCRYPTION_KEY"].strip()
+    if chave:
+        return chave.encode("utf-8")
+    material = current_app.config["SECRET_KEY"].encode("utf-8")
+    return base64.urlsafe_b64encode(hashlib.sha256(material).digest())
+
+
+def _criptografar_configuracao(valor):
+    if not valor:
+        return None
+    return "v1:" + Fernet(_chave_fernet()).encrypt(valor.encode("utf-8")).decode("utf-8")
+
+
+def _descriptografar_configuracao(valor):
+    if not valor or not str(valor).startswith("v1:"):
+        return ""
+    try:
+        return Fernet(_chave_fernet()).decrypt(str(valor)[3:].encode("utf-8")).decode("utf-8")
+    except (InvalidToken, ValueError, TypeError):
+        current_app.logger.warning("Uma credencial salva no painel nao pode ser lida com a chave atual.")
+        return ""
+
+
+def obter_token_mercadopago(estabelecimento_id=None):
+    estabelecimento = _estabelecimento_integracao(estabelecimento_id)
+    if estabelecimento is not None:
+        token = _descriptografar_configuracao(estabelecimento["mercadopago_token_criptografado"])
+        if token:
+            return token
+    return current_app.config["MERCADOPAGO_ACCESS_TOKEN"]
+
+
+def obter_segredo_webhook_mercadopago(estabelecimento_id=None):
+    estabelecimento = _estabelecimento_integracao(estabelecimento_id)
+    if estabelecimento is not None:
+        segredo = _descriptografar_configuracao(estabelecimento["webhook_secret_criptografado"])
+        if segredo:
+            return segredo
+    return current_app.config["MERCADOPAGO_WEBHOOK_SECRET"]
+
+
+def obter_whatsapp_estabelecimento(estabelecimento_id=None):
+    estabelecimento = _estabelecimento_integracao(estabelecimento_id)
+    telefone = estabelecimento["whatsapp"] if estabelecimento is not None else ""
+    somente_numeros = "".join(caractere for caractere in telefone if caractere.isdigit())
+    return somente_numeros or current_app.config["WHATSAPP_EMPRESA"]
+
+
+def obter_url_publica_estabelecimento(estabelecimento_id=None):
+    estabelecimento = _estabelecimento_integracao(estabelecimento_id)
+    url = (estabelecimento["url_publica"] if estabelecimento is not None else "").strip().rstrip("/")
+    endereco = urlparse(url)
+    if endereco.scheme == "https" and endereco.hostname:
+        return url
+    return current_app.config["BASE_URL"].rstrip("/")
+
+
+def atualizar_configuracao_estabelecimento(
+    estabelecimento_id, nome, whatsapp, valor_entrega, url_publica, access_token="", webhook_secret=""
+):
+    """Atualiza configuracoes da loja sem devolver credenciais ao navegador."""
+    campos = ["nome = ?", "whatsapp = ?", "telefone = ?", "valor_entrega = ?", "url_publica = ?"]
+    valores = [nome, whatsapp, whatsapp, valor_entrega, url_publica]
+    if access_token:
+        campos.append("mercadopago_token_criptografado = ?")
+        valores.append(_criptografar_configuracao(access_token))
+    if webhook_secret:
+        campos.append("webhook_secret_criptografado = ?")
+        valores.append(_criptografar_configuracao(webhook_secret))
+    valores.append(estabelecimento_id)
+    db = get_db()
+    db.execute(
+        f"UPDATE estabelecimentos SET {', '.join(campos)} WHERE id = ?",
+        valores,
+    )
+    db.commit()
 
 
 def criar_venda(cliente, produto, quantidade, valor_unitario, desconto, forma_pagamento, produto_id=None, canal_venda="INTERNA", estabelecimento_id=None):

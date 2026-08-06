@@ -1,20 +1,32 @@
 from functools import wraps
 import re
 import sqlite3
+from urllib.parse import urlparse
 
 from flask import Blueprint, current_app, flash, g, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from models import (
+    atualizar_configuracao_estabelecimento,
     criar_usuario,
     limpar_tentativas_login,
     listar_funcionarios,
+    obter_estabelecimento,
+    obter_segredo_webhook_mercadopago,
+    obter_token_mercadopago,
     obter_usuario_por_nome,
     quantidade_tentativas_login,
     registrar_tentativa_login,
 )
 
 auth_bp = Blueprint("auth", __name__)
+
+
+def _valor_monetario(texto):
+    valor = texto.strip().replace("R$", "").replace(" ", "")
+    if "," in valor:
+        valor = valor.replace(".", "").replace(",", ".")
+    return float(valor)
 
 
 @auth_bp.before_app_request
@@ -91,6 +103,48 @@ def sair():
 @owner_required
 def usuarios():
     return render_template("usuarios.html", usuarios=listar_funcionarios(g.usuario["estabelecimento_id"]))
+
+
+@auth_bp.route("/configuracoes", methods=["GET", "POST"])
+@owner_required
+def configuracoes():
+    estabelecimento = obter_estabelecimento(g.usuario["estabelecimento_id"])
+    if estabelecimento is None:
+        return "Estabelecimento nao encontrado", 404
+    if request.method == "POST":
+        try:
+            nome = request.form.get("nome", "").strip()
+            whatsapp = "".join(caractere for caractere in request.form.get("whatsapp", "") if caractere.isdigit())
+            valor_entrega = _valor_monetario(request.form.get("valor_entrega", ""))
+            url_publica = request.form.get("url_publica", "").strip().rstrip("/")
+            access_token = request.form.get("mercadopago_access_token", "").strip()
+            webhook_secret = request.form.get("mercadopago_webhook_secret", "").strip()
+            endereco = urlparse(url_publica)
+            if (
+                not 2 <= len(nome) <= 120
+                or not 10 <= len(whatsapp) <= 15
+                or not 0 <= valor_entrega <= 1_000
+                or endereco.scheme != "https"
+                or not endereco.hostname
+                or len(access_token) > 500
+                or len(webhook_secret) > 500
+            ):
+                raise ValueError
+            atualizar_configuracao_estabelecimento(
+                estabelecimento["id"], nome, whatsapp, valor_entrega, url_publica, access_token, webhook_secret
+            )
+            flash("Configuracoes salvas. O novo frete ja aparece no carrinho e no pagamento.", "success")
+            return redirect(url_for("auth.configuracoes"))
+        except (TypeError, ValueError):
+            flash("Confira nome, WhatsApp, URL HTTPS e valor de entrega.", "danger")
+    estabelecimento = obter_estabelecimento(estabelecimento["id"])
+    return render_template(
+        "configuracoes.html",
+        estabelecimento=estabelecimento,
+        url_publica=estabelecimento["url_publica"] or current_app.config["BASE_URL"],
+        token_configurado=bool(obter_token_mercadopago(estabelecimento["id"])),
+        webhook_configurado=bool(obter_segredo_webhook_mercadopago(estabelecimento["id"])),
+    )
 
 
 @auth_bp.route("/usuarios/novo", methods=["GET", "POST"])

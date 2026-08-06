@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}Configuracoes | Painel{% endblock %}
+{% block content %}
+<div class="page-heading"><h1>Configuracoes da loja</h1><p>Dados usados no delivery, pagamento e comunicacao com o cliente.</p></div>
+<div class="row justify-content-center"><div class="col-xl-9"><div class="card shadow-sm"><div class="card-body p-md-4">
+  <form method="post" class="row g-4" autocomplete="off">
+    <div class="col-md-7"><label class="form-label" for="nome">Nome da loja</label><input class="form-control" id="nome" name="nome" value="{{ estabelecimento.nome }}" minlength="2" maxlength="120" required></div>
+    <div class="col-md-5"><label class="form-label" for="whatsapp">WhatsApp da loja</label><input class="form-control" id="whatsapp" name="whatsapp" value="{{ estabelecimento.whatsapp }}" inputmode="tel" maxlength="20" placeholder="5571992843791" required><div class="form-text">Use apenas numeros com DDI e DDD.</div></div>
+    <div class="col-md-6"><label class="form-label" for="valor_entrega">Taxa de entrega</label><div class="input-group"><span class="input-group-text">R$</span><input class="form-control" id="valor_entrega" name="valor_entrega" value="{{ '%.2f'|format(estabelecimento.valor_entrega) }}" inputmode="decimal" required></div><div class="form-text">O valor e cobrado uma vez por pedido e ja aparece no carrinho.</div></div>
+    <div class="col-md-6"><label class="form-label" for="url_publica">Endereco publico do site</label><input class="form-control" id="url_publica" name="url_publica" value="{{ url_publica }}" type="url" inputmode="url" required><div class="form-text">Use HTTPS. Ex.: https://meninodossonhos.onrender.com</div></div>
+    <div class="col-12"><hr class="my-0"></div>
+    <div class="col-12"><h2 class="h5 mb-1">Mercado Pago</h2><p class="text-muted small mb-0">As credenciais ficam cifradas no banco e nunca sao exibidas novamente nesta tela.</p></div>
+    <div class="col-md-6"><label class="form-label" for="mercadopago_access_token">Access Token de producao</label><input class="form-control" id="mercadopago_access_token" name="mercadopago_access_token" type="password" maxlength="500" autocomplete="new-password" placeholder="{% if token_configurado %}Token ja configurado — deixe vazio para manter{% else %}Cole o Access Token aqui{% endif %}"><div class="form-text">{% if token_configurado %}Configurado. Preencha somente para substituir.{% else %}Necessario para criar pagamentos no Checkout Pro.{% endif %}</div></div>
+    <div class="col-md-6"><label class="form-label" for="mercadopago_webhook_secret">Assinatura secreta do webhook</label><input class="form-control" id="mercadopago_webhook_secret" name="mercadopago_webhook_secret" type="password" maxlength="500" autocomplete="new-password" placeholder="{% if webhook_configurado %}Segredo ja configurado — deixe vazio para manter{% else %}Cole a assinatura secreta{% endif %}"><div class="form-text">{% if webhook_configurado %}Configurada. Preencha somente para substituir.{% else %}Necessaria para validar avisos de pagamento.{% endif %}</div></div>
+    <div class="col-12"><div class="alert alert-light border mb-0 small">No Checkout Pro, a chave publica nao e usada pelo sistema. Configure apenas o Access Token e a assinatura secreta.</div></div>
+    <div class="col-12 d-flex justify-content-end"><button class="btn btn-primary px-4">Salvar configuracoes</button></div>
+  </form>
+</div></div></div></div>
+{% endblock %}
