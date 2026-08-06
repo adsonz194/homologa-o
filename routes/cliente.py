@@ -42,11 +42,6 @@ def salvar_carrinho(carrinho):
     session.modified = True
 
 
-def navegador_movel():
-    agente = request.headers.get("User-Agent", "").lower()
-    return any(termo in agente for termo in ("iphone", "ipad", "ipod", "android", "mobile"))
-
-
 def estabelecimento_principal():
     """A aplicacao voltou a operar somente o delivery principal."""
     return obter_estabelecimento_por_slug(current_app.config["ESTABELECIMENTO_PADRAO_SLUG"])
@@ -187,18 +182,13 @@ def iniciar_pagamento(pedido_id):
         flash("Este pedido nao esta disponivel para um novo pagamento.", "warning")
         return redirect(url_for("cliente.loja"))
     from routes.pagamentos import criar_autorizacao_pagamento
-    acesso_movel = navegador_movel()
     return render_template(
         "iniciar_pagamento.html",
         destino=url_for("pagamentos.criar_checkout_pedido", pedido_id=pedido_id),
-        titulo="Abrir pagamento no Mercado Pago" if acesso_movel else "Preparando o pagamento",
-        descricao=(
-            "Toque no botao para abrir o Checkout seguro. O celular usara o app Mercado Pago, se disponivel, ou o navegador."
-            if acesso_movel else "Voce sera direcionado ao ambiente seguro do Mercado Pago."
-        ),
+        titulo="Preparando o pagamento",
+        descricao="Voce sera direcionado ao ambiente seguro do Mercado Pago.",
         autorizacao_pagamento=criar_autorizacao_pagamento(pedido_atual),
-        texto_botao="Abrir pagamento no Mercado Pago" if acesso_movel else "Continuar para pagamento",
-        auto_submit=not acesso_movel,
+        auto_submit=True,
     )
 
 
