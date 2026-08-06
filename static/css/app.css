@@ -84,13 +84,36 @@ body.app-body {
 .app-footer { padding: 24px 0 32px; color: var(--muted); font-size: .84rem; text-align: center; }
 
 @media (max-width: 767.98px) {
-  .app-header { position: static; }
-  .app-navbar { align-items: flex-start; }
-  .brand { width: 100%; }
+  .app-header { position: static; padding: 10px 0; }
+  .app-navbar { align-items: flex-start; gap: 10px; }
+  .brand { width: 100%; font-size: .94rem; }
+  .brand-mark { width: 30px; height: 30px; border-radius: 9px; }
   .nav-actions { width: 100%; justify-content: flex-start; }
-  .app-shell { padding-top: 22px; }
+  .painel-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+  .painel-nav .btn, .painel-nav form, .painel-nav form .btn { width: 100%; min-width: 0; }
+  .painel-nav .btn { min-height: 39px; padding: .42rem .25rem; font-size: .72rem; white-space: normal; }
+  .app-shell { padding: 20px 14px 38px; }
+  .card { border-radius: 14px; }
+  .card-body { padding: 1rem; }
+  .page-heading { margin-bottom: 18px; }
+  .page-heading .btn { width: 100%; }
   .hero-delivery { padding: 24px; border-radius: 19px; }
   .hero-delivery .btn { width: 100%; margin-top: 16px; }
   .summary-card { position: static; }
-  .table td, .table th { padding: .75rem; }
+  .table-responsive { overflow: visible; }
+  .table.mobile-cards, .table.mobile-cards tbody, .table.mobile-cards tr, .table.mobile-cards td { display: block; width: 100%; }
+  .table.mobile-cards thead { display: none; }
+  .table.mobile-cards tbody tr { margin: 0; padding: .4rem 1rem; border-bottom: 8px solid var(--page); background: #fff; }
+  .table.mobile-cards tbody tr:last-child { border-bottom: 0; }
+  .table.mobile-cards td { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: .62rem 0; border: 0; text-align: right; overflow-wrap: anywhere; }
+  .table.mobile-cards td::before { flex: 0 0 35%; color: var(--muted); font-size: .72rem; font-weight: 800; letter-spacing: .04em; text-align: left; text-transform: uppercase; content: attr(data-label); }
+  .table.mobile-cards td[data-label="Ações"] { display: block; text-align: left; }
+  .table.mobile-cards td[data-label="Ações"]::before { display: block; margin-bottom: .55rem; }
+  .table.mobile-cards .order-actions { display: grid !important; grid-template-columns: 1fr; gap: .55rem !important; }
+  .table.mobile-cards .order-actions .form-select, .table.mobile-cards .order-actions .btn { width: 100%; }
+  .table.mobile-cards .empty-state { padding: 1.6rem 0; }
+  .table.mobile-cards .empty-state::before { display: none; }
+  .form-control, .form-select { font-size: 16px; }
+  .d-flex.justify-content-between.align-items-center.mb-3 { flex-wrap: wrap; gap: 12px; }
+  .d-flex.justify-content-between.align-items-center.mb-3 .btn { width: 100%; }
 }

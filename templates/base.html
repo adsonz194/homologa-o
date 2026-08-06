@@ -13,7 +13,7 @@
   <header class="app-header">
     <nav class="container app-navbar d-flex flex-wrap">
       <a class="brand me-auto" href="{{ url_for('vendas.index') if usuario else url_for('cliente.loja') }}"><span class="brand-mark">&#128722;</span><span>Sistema de Delivery</span></a>
-      <div class="nav-actions">
+      <div class="nav-actions{% if usuario %} painel-nav{% endif %}">
         {% if usuario %}
           <a class="btn btn-outline-light btn-sm" href="{{ url_for('vendas.index') }}">Vendas</a>
           <a class="btn btn-outline-light btn-sm" href="{{ url_for('pedidos.index') }}">Pedidos</a>
