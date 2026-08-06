@@ -62,7 +62,6 @@ def renderizar_loja():
         quantidade_carrinho=sum(carrinho_atual().values()),
         estabelecimento=estabelecimento,
         funcionamento=status_funcionamento_estabelecimento(estabelecimento),
-        locais_entrega=LOCAIS_ENTREGA,
     )
 
 
