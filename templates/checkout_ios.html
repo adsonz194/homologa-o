@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}Continuar pagamento | Delivery{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-6">
+    <section class="card shadow-sm text-center">
+      <div class="card-body p-4 p-md-5">
+        <div class="fs-1 mb-3" aria-hidden="true">&#128179;</div>
+        <h1 class="h3">Seu pedido está pronto para pagamento</h1>
+        <p class="text-muted mb-4">Toque no botão para abrir o ambiente seguro do Mercado Pago neste navegador.</p>
+        <a class="btn btn-primary btn-lg w-100" href="{{ checkout_url }}">Continuar para o pagamento</a>
+        <p class="small text-muted mt-4 mb-0">Não é necessário instalar ou abrir o aplicativo Mercado Pago. Código do pedido: <strong>{{ codigo_acompanhamento }}</strong>.</p>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

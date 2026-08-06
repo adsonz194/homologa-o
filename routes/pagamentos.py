@@ -5,7 +5,7 @@ from urllib.request import Request, urlopen
 from uuid import uuid4
 
 import mercadopago
-from flask import Blueprint, current_app, flash, g, redirect, request, session, url_for
+from flask import Blueprint, current_app, flash, g, redirect, render_template, request, session, url_for
 from itsdangerous import BadData, SignatureExpired, URLSafeTimedSerializer
 
 from models import (
@@ -44,6 +44,16 @@ def criar_autorizacao_pagamento(pedido):
         "pedido_id": pedido["id"],
         "codigo": pedido["codigo_acompanhamento"],
     })
+
+
+def navegador_ios():
+    """Safari bloqueia, em alguns casos, saltos automáticos para outro domínio.
+
+    Entregamos um link normal para que a abertura do Checkout Pro seja iniciada
+    pelo toque do comprador, dentro do próprio Safari (sem deep link de app).
+    """
+    agente = request.headers.get("User-Agent", "").lower()
+    return any(dispositivo in agente for dispositivo in ("iphone", "ipad", "ipod"))
 
 
 def autorizacao_pagamento_valida(pedido, autorizacao):
@@ -247,6 +257,13 @@ def criar_checkout_pedido(pedido_id):
         preference_id, checkout_url = criar_preferencia(preference, pedido["estabelecimento_id"])
         atualizar_preferencia_pedido(pedido_id, preference_id)
         session.pop("pedido_pagamento_pendente", None)
+        if navegador_ios():
+            current_app.logger.info("Checkout do pedido %s pronto para abertura manual no Safari.", pedido_id)
+            return render_template(
+                "checkout_ios.html",
+                checkout_url=checkout_url,
+                codigo_acompanhamento=pedido["codigo_acompanhamento"],
+            )
         # O 302 e o encadeamento de redirecionamentos normal do navegador
         # reproduzem o fluxo que ja funcionava em computadores e celulares.
         return redirect(checkout_url)
