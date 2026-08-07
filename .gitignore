@@ -16,6 +16,7 @@ deploy/sistemavenda.env
 *.sqlite3
 instance/
 uploads/
+backups/
 
 # Python e ambientes virtuais
 __pycache__/
@@ -34,6 +35,7 @@ htmlcov/
 # Logs e arquivos temporários
 *.log
 *.tmp
+tmp/
 *.bak
 *.swp
 
