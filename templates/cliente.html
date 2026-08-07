@@ -1,34 +1,59 @@
 {% extends 'base.html' %}
 {% block title %}{{ estabelecimento.nome }} | Delivery{% endblock %}
 {% block content %}
-<section class="delivery-topbar">
-  <div><div class="delivery-kicker">Delivery online</div><p>Escolha seus favoritos e receba onde estiver.</p></div>
-  <a class="cart-quick-link" href="{{ url_for('cliente.carrinho') }}"><i class="cart-icon" aria-hidden="true">&#128722;</i>Carrinho{% if quantidade_carrinho %}<span>{{ quantidade_carrinho }}</span>{% endif %}</a>
+<section class="food-storebar">
+  <div>
+    <div class="food-store-title">Delivery online</div>
+    <p>{{ estabelecimento.nome }} &middot; escolha, personalize e peça.</p>
+  </div>
+  <a class="cart-quick-link food-cart-link" href="{{ url_for('cliente.carrinho') }}"><i class="cart-icon" aria-hidden="true">&#128722;</i>Carrinho{% if quantidade_carrinho %}<span>{{ quantidade_carrinho }}</span>{% endif %}</a>
 </section>
 
 {% if funcionamento.aberto %}
-  <div class="alert alert-success py-2">{{ funcionamento.mensagem }}</div>
+  <div class="food-store-status open"><span aria-hidden="true"></span>{{ funcionamento.mensagem }}</div>
 {% else %}
-  <div class="alert alert-warning"><strong>Delivery fechado.</strong> {{ funcionamento.mensagem }} Horário normal: {{ funcionamento.horario }}.</div>
+  <div class="food-store-status closed"><span aria-hidden="true"></span><strong>Delivery fechado.</strong> {{ funcionamento.mensagem }} Horario normal: {{ funcionamento.horario }}.</div>
 {% endif %}
 
-<div class="page-heading d-flex flex-wrap justify-content-between align-items-end gap-2">
-  <div><h2>Cardapio</h2><p>Itens disponiveis para pedir agora.</p></div>
-  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('cliente.acompanhar_pedido') }}">Acompanhar pedido</a>
-</div>
+<section class="food-menu-heading">
+  <div><h1>Cardapio</h1><p>Escolha um item e, se quiser, personalize antes de adicionar.</p></div>
+  <a class="food-track-link" href="{{ url_for('cliente.acompanhar_pedido') }}">Acompanhar pedido</a>
+</section>
 
-<div class="row g-4">
+<div class="row g-3 food-grid">
   {% for produto in produtos %}
-    <div class="col-sm-6 col-lg-4"><article class="card product-card shadow-sm"><div class="card-body">
-      <div class="d-flex justify-content-between gap-2 align-items-start"><h3 class="h5 fw-bold mb-2">{{ produto.descricao }}</h3><span class="badge text-bg-light border">Disponivel</span></div>
-      <p class="product-meta mb-1">Codigo {{ produto.codigo_interno }}{% if produto.ean %} &middot; EAN {{ produto.ean }}{% endif %}</p>
-      <p class="product-price">R$ {{ '%.2f'|format(produto.valor_unitario) }}</p>
-      <p class="stock-label mb-3">{{ produto.estoque }} unidade(s) em estoque</p>
-      <form method="post" action="{{ url_for('cliente.adicionar_ao_carrinho', produto_id=produto.id) }}" class="d-flex gap-2">
-        <input class="form-control" type="number" name="quantidade" min="1" max="{{ produto.estoque }}" value="1" aria-label="Quantidade de {{ produto.descricao }}">
-        <button class="btn btn-success text-nowrap" {% if not funcionamento.aberto %}disabled{% endif %}>Adicionar</button>
-      </form>
-    </div></article></div>
+    {% set complementos = complementos_por_produto[produto.id] %}
+    <div class="col-sm-6 col-lg-4"><article class="card food-product-card">
+      <div class="card-body">
+        <div class="food-product-top">
+          <div><h2>{{ produto.descricao }}</h2><p>Disponivel agora</p></div>
+          <span class="food-product-icon" aria-hidden="true">&#127869;</span>
+        </div>
+        <p class="food-product-price">R$ {{ '%.2f'|format(produto.valor_unitario) }}</p>
+        {% if complementos %}<p class="food-personalize-hint">Personalize com acompanhamentos e molhos</p>{% endif %}
+        <form method="post" action="{{ url_for('cliente.adicionar_ao_carrinho', produto_id=produto.id) }}" class="food-add-form">
+          {% if complementos %}
+            <details class="food-options">
+              <summary>Personalizar pedido <small>opcional</small></summary>
+              <div class="food-options-list">
+                {% for complemento in complementos %}
+                  <label class="food-option">
+                    <input type="checkbox" name="complementos" value="{{ complemento.id }}">
+                    <span>{{ complemento.descricao }}</span>
+                    <strong>{% if complemento.valor_adicional > 0 %}+ R$ {{ '%.2f'|format(complemento.valor_adicional) }}{% else %}Gratis{% endif %}</strong>
+                  </label>
+                {% endfor %}
+              </div>
+            </details>
+          {% endif %}
+          <div class="food-add-actions">
+            <label class="visually-hidden" for="quantidade-{{ produto.id }}">Quantidade de {{ produto.descricao }}</label>
+            <input class="form-control" id="quantidade-{{ produto.id }}" type="number" name="quantidade" min="1" max="{{ produto.estoque }}" value="1">
+            <button class="btn food-add-button" {% if not funcionamento.aberto %}disabled{% endif %}>Adicionar</button>
+          </div>
+        </form>
+      </div>
+    </article></div>
   {% else %}
     <div class="col-12"><div class="card"><div class="empty-state"><h2 class="h5">Nenhum item disponivel agora</h2><p class="mb-0">Volte em alguns instantes para conferir o cardapio.</p></div></div></div>
   {% endfor %}

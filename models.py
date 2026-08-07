@@ -301,6 +301,59 @@ def atualizar_produto(produto_id, codigo_interno, ean, descricao, valor_unitario
     db.commit()
 
 
+def listar_complementos_produto(produto_id, somente_ativos=True):
+    consulta = "SELECT * FROM produto_complementos WHERE produto_id = ?"
+    parametros = [produto_id]
+    if somente_ativos:
+        consulta += " AND ativo = 1"
+    consulta += " ORDER BY descricao COLLATE NOCASE, id"
+    return get_db().execute(consulta, parametros).fetchall()
+
+
+def listar_complementos_por_produto(produtos):
+    """Agrupa os complementos ativos sem expor opcoes de outro produto."""
+    ids = [produto["id"] for produto in produtos]
+    resultado = {produto_id: [] for produto_id in ids}
+    if not ids:
+        return resultado
+    marcadores = ", ".join("?" for _ in ids)
+    linhas = get_db().execute(
+        f"""SELECT * FROM produto_complementos
+            WHERE ativo = 1 AND produto_id IN ({marcadores})
+            ORDER BY descricao COLLATE NOCASE, id""",
+        ids,
+    ).fetchall()
+    for complemento in linhas:
+        resultado.setdefault(complemento["produto_id"], []).append(complemento)
+    return resultado
+
+
+def substituir_complementos_produto(produto_id, complementos):
+    """Salva a lista atual de complementos; pedidos antigos mantem sua descricao."""
+    db = get_db()
+    with db:
+        db.execute("DELETE FROM produto_complementos WHERE produto_id = ?", (produto_id,))
+        db.executemany(
+            """INSERT INTO produto_complementos (produto_id, descricao, valor_adicional)
+               VALUES (?, ?, ?)""",
+            [(produto_id, item["descricao"], item["valor_adicional"]) for item in complementos],
+        )
+
+
+def complementos_selecionados(produto_id, ids_complementos):
+    """Retorna somente complementos ativos que realmente pertencem ao produto."""
+    ids = sorted({int(complemento_id) for complemento_id in ids_complementos})
+    if not ids:
+        return []
+    marcadores = ", ".join("?" for _ in ids)
+    return get_db().execute(
+        f"""SELECT * FROM produto_complementos
+            WHERE produto_id = ? AND ativo = 1 AND id IN ({marcadores})
+            ORDER BY descricao COLLATE NOCASE, id""",
+        [produto_id, *ids],
+    ).fetchall()
+
+
 def listar_produtos(estabelecimento_id):
     return get_db().execute("SELECT * FROM produtos WHERE estabelecimento_id = ? ORDER BY descricao COLLATE NOCASE", (estabelecimento_id,)).fetchall()
 
@@ -339,14 +392,39 @@ def buscar_produtos(consulta, estabelecimento_id, limite=10):
 
 def detalhes_carrinho(carrinho, estabelecimento_id):
     itens = []
-    for produto_id, quantidade in carrinho.items():
+    for chave, entrada in carrinho.items():
         try:
-            produto = obter_produto(int(produto_id), estabelecimento_id)
-            quantidade = int(quantidade)
+            # Compatibilidade com os carrinhos salvos antes dos complementos,
+            # que eram somente {"id_do_produto": quantidade}.
+            if isinstance(entrada, dict):
+                produto_id = int(entrada.get("produto_id"))
+                quantidade = int(entrada.get("quantidade"))
+                ids_complementos = entrada.get("complementos", [])
+            else:
+                produto_id = int(chave)
+                quantidade = int(entrada)
+                ids_complementos = []
+            produto = obter_produto(produto_id, estabelecimento_id)
+            complementos = complementos_selecionados(produto_id, ids_complementos)
         except (TypeError, ValueError):
             continue
         if produto is not None and quantidade > 0:
-            itens.append({"produto": produto, "quantidade": quantidade, "subtotal": produto["valor_unitario"] * quantidade})
+            valor_complementos = sum(complemento["valor_adicional"] for complemento in complementos)
+            valor_unitario = produto["valor_unitario"] + valor_complementos
+            nomes_complementos = ", ".join(complemento["descricao"] for complemento in complementos)
+            descricao = produto["descricao"]
+            if nomes_complementos:
+                descricao += f" (Complementos: {nomes_complementos})"
+            itens.append({
+                "chave": str(chave),
+                "produto": produto,
+                "complementos": complementos,
+                "quantidade": quantidade,
+                "valor_complementos": valor_complementos,
+                "valor_unitario": valor_unitario,
+                "descricao": descricao,
+                "subtotal": valor_unitario * quantidade,
+            })
     return itens
 
 
@@ -366,7 +444,6 @@ def criar_pedido(cliente, telefone, endereco, local_entrega, modalidade_entrega,
             if produto is None or not produto["disponivel"] or produto["estoque"] < item["quantidade"]:
                 raise EstoqueInsuficiente(f"{item['produto']['descricao']} nao possui estoque suficiente.")
             item["produto"] = produto
-            item["subtotal"] = produto["valor_unitario"] * item["quantidade"]
             total += item["subtotal"]
         cursor = db.execute(
             """INSERT INTO pedidos
@@ -381,7 +458,7 @@ def criar_pedido(cliente, telefone, endereco, local_entrega, modalidade_entrega,
             db.execute(
                 """INSERT INTO pedido_itens (pedido_id, produto_id, descricao, quantidade, valor_unitario)
                    VALUES (?, ?, ?, ?, ?)""",
-                (pedido_id, produto["id"], produto["descricao"], item["quantidade"], produto["valor_unitario"]),
+                (pedido_id, produto["id"], item["descricao"], item["quantidade"], item["valor_unitario"]),
             )
     return pedido_id
 

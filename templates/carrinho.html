@@ -4,17 +4,17 @@
 <div class="page-heading d-flex justify-content-between align-items-end gap-3"><div><h1>Seu carrinho</h1><p>Revise os itens antes de finalizar o pedido.</p></div><a class="btn btn-outline-primary" href="{{ url_for('cliente.loja') }}">Continuar comprando</a></div>
 {% if itens %}
   <div class="row g-4">
-    <div class="col-lg-8"><div class="card shadow-sm"><div class="table-responsive"><table class="table align-middle">
+    <div class="col-lg-8"><div class="card shadow-sm"><div class="table-responsive"><table class="table align-middle mobile-cards">
       <thead><tr><th>Produto</th><th>Valor</th><th>Quantidade</th><th>Subtotal</th><th></th></tr></thead>
       <tbody>{% for item in itens %}<tr>
-        <td><strong>{{ item.produto.descricao }}</strong><br><small class="text-muted">Codigo {{ item.produto.codigo_interno }}</small></td>
-        <td>R$ {{ '%.2f'|format(item.produto.valor_unitario) }}</td>
-        <td><form method="post" action="{{ url_for('cliente.atualizar_carrinho', produto_id=item.produto.id) }}" class="d-flex gap-2"><input class="form-control" type="number" name="quantidade" min="0" max="{{ item.produto.estoque }}" value="{{ item.quantidade }}" aria-label="Quantidade" style="max-width: 82px"><button class="btn btn-outline-primary btn-sm">Atualizar</button></form></td>
-        <td><strong>R$ {{ '%.2f'|format(item.subtotal) }}</strong></td>
-        <td><form method="post" action="{{ url_for('cliente.atualizar_carrinho', produto_id=item.produto.id) }}"><input type="hidden" name="quantidade" value="0"><button class="btn btn-outline-danger btn-sm">Remover</button></form></td>
+        <td data-label="Produto"><strong>{{ item.produto.descricao }}</strong>{% if item.complementos %}<br><small class="text-muted">+ {{ item.complementos|map(attribute='descricao')|join(', ') }}</small>{% endif %}<br><small class="text-muted">Codigo {{ item.produto.codigo_interno }}</small></td>
+        <td data-label="Valor">R$ {{ '%.2f'|format(item.valor_unitario) }}</td>
+        <td data-label="Quantidade"><form method="post" action="{{ url_for('cliente.atualizar_carrinho', item_key=item.chave) }}" class="d-flex gap-2"><input class="form-control" type="number" name="quantidade" min="0" max="{{ item.produto.estoque }}" value="{{ item.quantidade }}" aria-label="Quantidade" style="max-width: 82px"><button class="btn btn-outline-primary btn-sm">Atualizar</button></form></td>
+        <td data-label="Subtotal"><strong>R$ {{ '%.2f'|format(item.subtotal) }}</strong></td>
+        <td data-label="Acoes"><form method="post" action="{{ url_for('cliente.atualizar_carrinho', item_key=item.chave) }}"><input type="hidden" name="quantidade" value="0"><button class="btn btn-outline-danger btn-sm">Remover</button></form></td>
       </tr>{% endfor %}</tbody>
     </table></div></div></div>
-    <aside class="col-lg-4"><div class="card summary-card"><div class="card-body"><h2 class="h5 summary-title mb-4">Resumo do pedido</h2><div class="d-flex justify-content-between small mb-3"><span>Produtos</span><strong>R$ {{ '%.2f'|format(subtotal) }}</strong></div><div class="d-flex justify-content-between small mb-3"><span>Taxa de entrega</span><strong>R$ {{ '%.2f'|format(estabelecimento.valor_entrega) }}</strong></div><div class="d-flex justify-content-between summary-total"><span>Total</span><span>R$ {{ '%.2f'|format(total) }}</span></div>{% if funcionamento.aberto %}<a class="btn btn-success w-100 mt-4" href="{{ url_for('cliente.finalizar') }}">Finalizar pedido</a>{% else %}<div class="alert alert-warning small mt-4 mb-0"><strong>Delivery fechado.</strong> {{ funcionamento.mensagem }}</div>{% endif %}</div></div></aside>
+    <aside class="col-lg-4"><div class="card summary-card"><div class="card-body"><h2 class="h5 summary-title mb-4">Resumo do pedido</h2><div class="d-flex justify-content-between small mb-3"><span>Produtos</span><strong>R$ {{ '%.2f'|format(subtotal) }}</strong></div><div class="d-flex justify-content-between small mb-1"><span>Taxa de entrega</span><strong>R$ {{ '%.2f'|format(estabelecimento.valor_entrega) }}</strong></div><p class="small text-muted mb-3">A retirada na loja remove esta taxa na finalizacao.</p><div class="d-flex justify-content-between summary-total"><span>Total estimado</span><span>R$ {{ '%.2f'|format(total) }}</span></div>{% if funcionamento.aberto %}<a class="btn btn-success w-100 mt-4" href="{{ url_for('cliente.finalizar') }}">Finalizar pedido</a>{% else %}<div class="alert alert-warning small mt-4 mb-0"><strong>Delivery fechado.</strong> {{ funcionamento.mensagem }}</div>{% endif %}</div></div></aside>
   </div>
 {% else %}
   <div class="card"><div class="empty-state"><h2 class="h5">Seu carrinho esta vazio</h2><p>Adicione produtos para continuar.</p><a class="btn btn-primary mt-2" href="{{ url_for('cliente.loja') }}">Ver cardapio</a></div></div>

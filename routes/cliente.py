@@ -5,9 +5,11 @@ from flask import Blueprint, current_app, flash, jsonify, redirect, render_templ
 from models import (
     EstoqueInsuficiente,
     LOCAIS_ENTREGA,
+    complementos_selecionados,
     criar_pedido,
     detalhes_carrinho,
     itens_pedido,
+    listar_complementos_por_produto,
     listar_produtos_disponiveis,
     obter_estabelecimento,
     obter_estabelecimento_por_slug,
@@ -38,13 +40,53 @@ STATUS_OPERACIONAL_NOMES = {
 
 
 def carrinho_atual():
-    carrinho = session.get("carrinho", {})
-    return carrinho if isinstance(carrinho, dict) else {}
+    bruto = session.get("carrinho", {})
+    if not isinstance(bruto, dict):
+        return {}
+
+    # Carrinhos antigos usavam apenas o ID do produto como chave. Esta
+    # normalizacao permite que eles continuem funcionando junto com itens
+    # personalizados, sem misturar complementos de pedidos diferentes.
+    carrinho = {}
+    for chave_antiga, valor in bruto.items():
+        try:
+            if isinstance(valor, dict):
+                produto_id = int(valor.get("produto_id"))
+                quantidade = int(valor.get("quantidade"))
+                complementos = sorted({int(item) for item in valor.get("complementos", [])})
+            else:
+                produto_id = int(chave_antiga)
+                quantidade = int(valor)
+                complementos = []
+            if quantidade <= 0:
+                continue
+        except (TypeError, ValueError):
+            continue
+        chave = chave_item_carrinho(produto_id, complementos)
+        if chave not in carrinho:
+            carrinho[chave] = {"produto_id": produto_id, "quantidade": 0, "complementos": complementos}
+        carrinho[chave]["quantidade"] += quantidade
+    if carrinho != bruto:
+        salvar_carrinho(carrinho)
+    return carrinho
 
 
 def salvar_carrinho(carrinho):
     session["carrinho"] = carrinho
     session.modified = True
+
+
+def chave_item_carrinho(produto_id, complementos):
+    sufixo = "-".join(str(item) for item in sorted(set(complementos))) or "sem"
+    return f"{produto_id}--{sufixo}"
+
+
+def quantidade_produto_no_carrinho(carrinho, produto_id, exceto_chave=None):
+    return sum(
+        int(item.get("quantidade", 0))
+        for chave, item in carrinho.items()
+        if chave != exceto_chave and int(item.get("produto_id", 0)) == produto_id
+    )
 
 
 def estabelecimento_principal():
@@ -57,10 +99,13 @@ def renderizar_loja():
     if estabelecimento is None:
         return "Delivery indisponivel", 503
     session["estabelecimento_publico_id"] = estabelecimento["id"]
+    produtos = listar_produtos_disponiveis(estabelecimento["id"])
+    carrinho = carrinho_atual()
     return render_template(
         "cliente.html",
-        produtos=listar_produtos_disponiveis(estabelecimento["id"]),
-        quantidade_carrinho=sum(carrinho_atual().values()),
+        produtos=produtos,
+        complementos_por_produto=listar_complementos_por_produto(produtos),
+        quantidade_carrinho=sum(item["quantidade"] for item in carrinho.values()),
         estabelecimento=estabelecimento,
         funcionamento=status_funcionamento_estabelecimento(estabelecimento),
     )
@@ -91,13 +136,25 @@ def adicionar_ao_carrinho(produto_id):
     if produto is None or not produto["disponivel"] or produto["estoque"] <= 0:
         flash("Este produto nao esta mais disponivel.", "warning")
         return redirect(url_for("cliente.loja"))
+    try:
+        ids_complementos = sorted({int(item) for item in request.form.getlist("complementos")})
+    except ValueError:
+        flash("Os complementos selecionados nao sao validos.", "warning")
+        return redirect(url_for("cliente.loja"))
+    complementos = complementos_selecionados(produto_id, ids_complementos)
+    if len(complementos) != len(ids_complementos):
+        flash("Um dos complementos nao esta mais disponivel. Escolha novamente.", "warning")
+        return redirect(url_for("cliente.loja"))
+
     carrinho = carrinho_atual()
-    chave = str(produto_id)
-    quantidade_no_carrinho = int(carrinho.get(chave, 0))
+    chave = chave_item_carrinho(produto_id, ids_complementos)
+    quantidade_no_carrinho = quantidade_produto_no_carrinho(carrinho, produto_id)
     if quantidade + quantidade_no_carrinho > produto["estoque"]:
         flash(f"Ha apenas {produto['estoque']} unidade(s) disponivel(is) deste produto.", "warning")
         return redirect(url_for("cliente.loja"))
-    carrinho[chave] = quantidade_no_carrinho + quantidade
+    if chave not in carrinho:
+        carrinho[chave] = {"produto_id": produto_id, "quantidade": 0, "complementos": ids_complementos}
+    carrinho[chave]["quantidade"] += quantidade
     salvar_carrinho(carrinho)
     flash("Produto adicionado ao carrinho.", "success")
     return redirect(url_for("cliente.loja"))
@@ -118,8 +175,8 @@ def carrinho():
     )
 
 
-@cliente_bp.post("/cliente/carrinho/atualizar/<int:produto_id>")
-def atualizar_carrinho(produto_id):
+@cliente_bp.post("/cliente/carrinho/atualizar/<item_key>")
+def atualizar_carrinho(item_key):
     estabelecimento = estabelecimento_principal()
     if estabelecimento is None:
         return "Delivery indisponivel", 503
@@ -129,20 +186,30 @@ def atualizar_carrinho(produto_id):
     except (KeyError, ValueError):
         flash("Quantidade invalida.", "danger")
         return redirect(url_for("cliente.carrinho"))
-    chave = str(produto_id)
+    item = carrinho.get(item_key)
+    if not isinstance(item, dict):
+        flash("Item do carrinho nao encontrado.", "warning")
+        return redirect(url_for("cliente.carrinho"))
+    produto_id = item.get("produto_id")
+    try:
+        produto_id = int(produto_id)
+    except (TypeError, ValueError):
+        carrinho.pop(item_key, None)
+        salvar_carrinho(carrinho)
+        return redirect(url_for("cliente.carrinho"))
     produto = obter_produto(produto_id, estabelecimento["id"])
     if produto is None or not produto["disponivel"]:
-        carrinho.pop(chave, None)
+        carrinho.pop(item_key, None)
         salvar_carrinho(carrinho)
         flash("Produto indisponivel removido do carrinho.", "warning")
         return redirect(url_for("cliente.carrinho"))
-    if quantidade > produto["estoque"]:
+    if quantidade + quantidade_produto_no_carrinho(carrinho, produto_id, item_key) > produto["estoque"]:
         flash(f"Ha apenas {produto['estoque']} unidade(s) disponivel(is) deste produto.", "warning")
         return redirect(url_for("cliente.carrinho"))
     if quantidade <= 0:
-        carrinho.pop(chave, None)
+        carrinho.pop(item_key, None)
     else:
-        carrinho[chave] = quantidade
+        carrinho[item_key]["quantidade"] = quantidade
     salvar_carrinho(carrinho)
     return redirect(url_for("cliente.carrinho"))
 

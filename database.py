@@ -62,6 +62,15 @@ def init_db():
         valor_unitario REAL NOT NULL CHECK(valor_unitario > 0),
         criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS produto_complementos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        produto_id INTEGER NOT NULL,
+        descricao TEXT NOT NULL,
+        valor_adicional REAL NOT NULL DEFAULT 0 CHECK(valor_adicional >= 0),
+        ativo INTEGER NOT NULL DEFAULT 1,
+        criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(produto_id) REFERENCES produtos(id) ON DELETE CASCADE
+    )""")
     db.execute("""CREATE TABLE IF NOT EXISTS usuarios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT NOT NULL,
@@ -202,6 +211,7 @@ def init_db():
         )
     db.execute("CREATE INDEX IF NOT EXISTS idx_produtos_descricao ON produtos(descricao)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_produtos_estabelecimento ON produtos(estabelecimento_id, descricao)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_produto_complementos_produto ON produto_complementos(produto_id, ativo)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_vendas_estabelecimento ON vendas(estabelecimento_id, id)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_pedidos_estabelecimento ON pedidos(estabelecimento_id, id)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_usuarios_estabelecimento ON usuarios(estabelecimento_id, usuario)")

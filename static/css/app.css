@@ -8,6 +8,9 @@
   --line: #e2e8f0;
   --surface: #ffffff;
   --page: #f5f7fb;
+  --food: #e51b2b;
+  --food-dark: #bd1020;
+  --food-soft: #fff1f2;
   --radius: 18px;
   --shadow: 0 16px 38px rgba(15, 23, 42, .08);
 }
@@ -73,6 +76,52 @@ body.app-body {
 .product-meta { color: var(--muted); font-size: .78rem; }
 .product-price { margin-top: auto; padding-top: 18px; color: var(--brand); font-size: 1.45rem; font-weight: 850; letter-spacing: -.04em; }
 .stock-label { color: var(--muted); font-size: .82rem; }
+.food-storebar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; padding: 4px 0 15px; border-bottom: 1px solid var(--line); }
+.food-store-title { color: #202020; font-size: clamp(1.28rem, 3vw, 1.55rem); font-weight: 850; letter-spacing: -.045em; }
+.food-storebar p { margin: 3px 0 0; color: #717171; font-size: .86rem; }
+.food-cart-link { color: #333; border-color: #dedede; box-shadow: none; }
+.food-cart-link:hover { color: var(--food-dark); border-color: #f7c7cc; background: var(--food-soft); }
+.food-cart-link span { background: var(--food); }
+.food-store-status { display: inline-flex; align-items: center; gap: 7px; margin: 4px 0 23px; color: #4c4c4c; font-size: .82rem; }
+.food-store-status > span { width: 8px; height: 8px; border-radius: 50%; }
+.food-store-status.open > span { background: #1c9b52; box-shadow: 0 0 0 4px #dff6e8; }
+.food-store-status.closed > span { background: var(--food); box-shadow: 0 0 0 4px #ffe1e4; }
+.food-menu-heading { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
+.food-menu-heading h1 { margin: 0; color: #202020; font-size: clamp(1.45rem, 4vw, 1.9rem); font-weight: 850; letter-spacing: -.05em; }
+.food-menu-heading p { margin: 5px 0 0; color: #777; font-size: .88rem; }
+.food-track-link { color: var(--food); font-size: .86rem; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.food-track-link:hover { color: var(--food-dark); text-decoration: underline; }
+.food-grid { --bs-gutter-y: 1rem; }
+.food-product-card { height: 100%; border: 1px solid #ececec; border-radius: 15px; box-shadow: none; transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+.food-product-card:hover { border-color: #f1c1c6; box-shadow: 0 12px 26px rgba(39, 39, 39, .08); transform: translateY(-2px); }
+.food-product-card .card-body { display: flex; flex-direction: column; min-height: 244px; padding: 1.2rem; }
+.food-product-top { display: flex; gap: 12px; justify-content: space-between; }
+.food-product-top h2 { margin: 0; color: #292929; font-size: 1.02rem; font-weight: 800; line-height: 1.28; }
+.food-product-top p { margin: 5px 0 0; color: #878787; font-size: .76rem; }
+.food-product-icon { display: grid; flex: 0 0 auto; width: 40px; height: 40px; place-items: center; border-radius: 12px; background: #fff5f5; font-size: 1.15rem; }
+.food-product-price { margin: 16px 0 0; color: #242424; font-size: 1.12rem; font-weight: 850; letter-spacing: -.035em; }
+.food-personalize-hint { margin: 5px 0 0; color: #737373; font-size: .76rem; }
+.food-add-form { margin-top: auto; padding-top: 14px; }
+.food-options { margin-bottom: 11px; border: 1px solid #eee; border-radius: 10px; background: #fcfcfc; }
+.food-options summary { padding: .62rem .7rem; color: #4a4a4a; cursor: pointer; font-size: .81rem; font-weight: 750; list-style: none; }
+.food-options summary::-webkit-details-marker { display: none; }
+.food-options summary::after { float: right; color: var(--food); content: '+'; font-size: 1rem; line-height: .8; }
+.food-options[open] summary { border-bottom: 1px solid #eee; }
+.food-options[open] summary::after { content: '−'; }
+.food-options summary small { margin-left: 4px; color: #999; font-weight: 600; }
+.food-options-list { padding: .35rem .7rem .6rem; }
+.food-option { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 8px; padding: .42rem 0; color: #444; cursor: pointer; font-size: .8rem; }
+.food-option + .food-option { border-top: 1px solid #f0f0f0; }
+.food-option input { width: 15px; height: 15px; accent-color: var(--food); }
+.food-option strong { color: #555; font-size: .73rem; white-space: nowrap; }
+.food-add-actions { display: flex; gap: 9px; }
+.food-add-actions .form-control { width: 72px; min-height: 40px; padding: .35rem .5rem; text-align: center; }
+.food-add-button { flex: 1; min-height: 40px; color: #fff; border-color: var(--food); background: var(--food); box-shadow: none; }
+.food-add-button:hover, .food-add-button:focus { color: #fff; border-color: var(--food-dark); background: var(--food-dark); }
+.food-add-button:disabled { color: #fff; border-color: #c7c7c7; background: #c7c7c7; }
+.complementos-editor { padding: 1rem; border: 1px solid var(--line); border-radius: 14px; background: #fbfcff; }
+.complemento-linha { padding: .72rem 0; }
+.complemento-linha + .complemento-linha { border-top: 1px solid #e9edf5; }
 .summary-card { position: sticky; top: 86px; }
 .summary-card .summary-title { color: var(--ink); font-weight: 800; }
 .summary-total { padding-top: 14px; border-top: 1px solid var(--line); font-size: 1.12rem; font-weight: 800; }
@@ -109,6 +158,15 @@ body.app-body {
   .delivery-topbar { align-items: center; margin-bottom: 17px; }
   .delivery-topbar p { display: none; }
   .delivery-kicker { font-size: 1.1rem; }
+  .food-storebar { margin-bottom: 9px; padding-bottom: 12px; }
+  .food-storebar p { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .food-cart-link { padding: .47rem .58rem; font-size: .78rem; }
+  .food-store-status { margin-bottom: 18px; }
+  .food-menu-heading { align-items: flex-start; flex-direction: column; gap: 9px; }
+  .food-product-card .card-body { min-height: 0; padding: 1rem; }
+  .food-add-actions .form-control { width: 66px; }
+  .complementos-editor { padding: .85rem; }
+  .complemento-linha { padding: .55rem 0 .85rem; }
   .summary-card { position: static; }
   .table-responsive { overflow: visible; }
   .table.mobile-cards, .table.mobile-cards tbody, .table.mobile-cards tr, .table.mobile-cards td { display: block; width: 100%; }
