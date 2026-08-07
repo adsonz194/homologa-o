@@ -350,7 +350,7 @@ def detalhes_carrinho(carrinho, estabelecimento_id):
     return itens
 
 
-def criar_pedido(cliente, telefone, endereco, local_entrega, email, forma_pagamento, carrinho, estabelecimento_id):
+def criar_pedido(cliente, telefone, endereco, local_entrega, modalidade_entrega, email, forma_pagamento, carrinho, estabelecimento_id):
     itens = detalhes_carrinho(carrinho, estabelecimento_id)
     if not itens:
         raise EstoqueInsuficiente("Carrinho vazio.")
@@ -359,7 +359,7 @@ def criar_pedido(cliente, telefone, endereco, local_entrega, email, forma_pagame
         raise EstoqueInsuficiente("Estabelecimento indisponivel.")
     db = get_db()
     with db:
-        valor_entrega = estabelecimento["valor_entrega"]
+        valor_entrega = estabelecimento["valor_entrega"] if modalidade_entrega == "ENTREGA" else 0
         total = valor_entrega
         for item in itens:
             produto = db.execute("SELECT * FROM produtos WHERE id = ? AND estabelecimento_id = ?", (item["produto"]["id"], estabelecimento_id)).fetchone()
@@ -370,10 +370,10 @@ def criar_pedido(cliente, telefone, endereco, local_entrega, email, forma_pagame
             total += item["subtotal"]
         cursor = db.execute(
             """INSERT INTO pedidos
-               (cliente, telefone, endereco, local_entrega, email, forma_pagamento, valor_total, valor_entrega,
+               (cliente, telefone, endereco, local_entrega, modalidade_entrega, email, forma_pagamento, valor_total, valor_entrega,
                 codigo_acompanhamento, estabelecimento_id, estoque_reservado)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
-            (cliente, telefone, endereco, local_entrega, email, forma_pagamento, total, valor_entrega, gerar_codigo_acompanhamento(db), estabelecimento_id),
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
+            (cliente, telefone, endereco, local_entrega, modalidade_entrega, email, forma_pagamento, total, valor_entrega, gerar_codigo_acompanhamento(db), estabelecimento_id),
         )
         pedido_id = cursor.lastrowid
         for item in itens:

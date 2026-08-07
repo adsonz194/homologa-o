@@ -1,17 +1,40 @@
 {% extends 'base.html' %}
 {% block title %}Finalizar pedido | Delivery{% endblock %}
 {% block content %}
-<div class="page-heading"><h1>Finalizar pedido</h1><p>Informe os dados de entrega e escolha como deseja pagar.</p></div>
+<div class="page-heading"><h1>Finalizar pedido</h1><p>Escolha entrega ou retirada e siga para o pagamento seguro.</p></div>
 <div class="row g-4"><div class="col-lg-7"><div class="card shadow-sm"><div class="card-body p-md-4">
-  <form method="post" class="row g-3">
+  <form method="post" class="row g-3" id="form-finalizar">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="col-12"><label class="form-label">Nome</label><input class="form-control" name="cliente" minlength="2" maxlength="100" required autocomplete="name" placeholder="Como devemos chamar voce?"></div>
     <div class="col-md-6"><label class="form-label">Telefone / WhatsApp</label><input class="form-control" name="telefone" inputmode="tel" maxlength="20" required autocomplete="tel" placeholder="(00) 00000-0000"></div>
-    <div class="col-12"><label class="form-label">Local de entrega</label><select class="form-select" name="local_entrega" required><option value="" selected disabled>Selecione onde será entregue</option>{% for codigo, nome, horario in locais_entrega %}<option value="{{ codigo }}">{{ nome }} - pedidos até {{ horario }}</option>{% endfor %}</select><div class="form-text">Selecione o local antes de informar o endereço completo.</div></div>
-    <div class="col-12"><label class="form-label">Endereco completo</label><textarea class="form-control" name="endereco" rows="4" minlength="8" maxlength="300" placeholder="Rua, numero, bairro e complemento" required></textarea></div>
-    <div class="col-12"><label class="form-label">Forma de pagamento</label><select class="form-select" name="forma_pagamento" required><option value="PIX">Pix</option><option value="CREDITO">Cartao de credito</option><option value="DEBITO">Cartao de debito</option></select><div class="form-text">O pagamento sera concluido no ambiente seguro do Mercado Pago.</div></div>
+    <fieldset class="col-12"><legend class="form-label fs-6">Como deseja receber?</legend><div class="row g-2"><div class="col-sm-6"><label class="border rounded-3 p-3 d-block h-100"><input class="form-check-input me-2" type="radio" name="modalidade_entrega" value="ENTREGA" checked> <strong>Receber por delivery</strong><span class="d-block small text-muted mt-1">A taxa de entrega será incluída.</span></label></div><div class="col-sm-6"><label class="border rounded-3 p-3 d-block h-100"><input class="form-check-input me-2" type="radio" name="modalidade_entrega" value="RETIRADA"> <strong>Retirar na loja</strong><span class="d-block small text-muted mt-1">Sem taxa de entrega.</span></label></div></div></fieldset>
+    <div id="dados-entrega" class="col-12 row g-3 mx-0 p-0"><div class="col-12"><label class="form-label">Local de entrega</label><select class="form-select" name="local_entrega" required><option value="" selected disabled>Selecione onde será entregue</option>{% for codigo, nome, horario in locais_entrega %}<option value="{{ codigo }}">{{ nome }} - pedidos até {{ horario }}</option>{% endfor %}</select><div class="form-text">Selecione o local antes de informar o endereço completo.</div></div><div class="col-12"><label class="form-label">Endereco completo</label><textarea class="form-control" name="endereco" rows="4" minlength="8" maxlength="300" placeholder="Rua, numero, bairro e complemento" required></textarea></div></div>
+    <div class="col-12"><label class="form-label">Forma de pagamento</label><select class="form-select" name="forma_pagamento" required><option value="PIX">Pix</option><option value="CREDITO">Cartao de credito</option><option value="DEBITO">Cartao de debito</option></select><div class="form-text">O pagamento será concluído no ambiente seguro do Mercado Pago.</div></div>
     <div class="col-12"><button class="btn btn-success w-100">Ir para pagamento seguro</button></div>
   </form>
 </div></div></div>
-<aside class="col-lg-5"><div class="card summary-card"><div class="card-body"><h2 class="h5 summary-title mb-4">Resumo</h2>{% for item in itens %}<div class="d-flex justify-content-between gap-3 small mb-3"><span>{{ item.quantidade }} &times; {{ item.produto.descricao }}</span><strong class="text-nowrap">R$ {{ '%.2f'|format(item.subtotal) }}</strong></div>{% endfor %}{% if estabelecimento.valor_entrega %}<div class="d-flex justify-content-between small mb-3"><span>Taxa de entrega</span><strong>R$ {{ '%.2f'|format(estabelecimento.valor_entrega) }}</strong></div>{% endif %}<div class="d-flex justify-content-between summary-total"><span>Total</span><span>R$ {{ '%.2f'|format(total) }}</span></div></div></div></aside></div>
+<aside class="col-lg-5"><div class="card summary-card"><div class="card-body"><h2 class="h5 summary-title mb-4">Resumo</h2>{% for item in itens %}<div class="d-flex justify-content-between gap-3 small mb-3"><span>{{ item.quantidade }} &times; {{ item.produto.descricao }}</span><strong class="text-nowrap">R$ {{ '%.2f'|format(item.subtotal) }}</strong></div>{% endfor %}<div class="d-flex justify-content-between small mb-3" id="linha-entrega"><span>Taxa de entrega</span><strong>R$ {{ '%.2f'|format(estabelecimento.valor_entrega) }}</strong></div><div class="d-flex justify-content-between summary-total"><span>Total</span><span id="total-pedido">R$ {{ '%.2f'|format(total) }}</span></div></div></div></aside></div>
+<script>
+  (() => {
+    const radios = document.querySelectorAll('input[name="modalidade_entrega"]');
+    const dadosEntrega = document.getElementById('dados-entrega');
+    const local = dadosEntrega.querySelector('[name="local_entrega"]');
+    const endereco = dadosEntrega.querySelector('[name="endereco"]');
+    const linhaEntrega = document.getElementById('linha-entrega');
+    const total = document.getElementById('total-pedido');
+    const subtotal = Number({{ subtotal|tojson }});
+    const taxa = Number({{ estabelecimento.valor_entrega|tojson }});
+    const formatar = (valor) => `R$ ${valor.toFixed(2).replace('.', ',')}`;
+    function atualizarModalidade() {
+      const retirada = document.querySelector('input[name="modalidade_entrega"]:checked').value === 'RETIRADA';
+      dadosEntrega.classList.toggle('d-none', retirada);
+      local.disabled = retirada; local.required = !retirada;
+      endereco.disabled = retirada; endereco.required = !retirada;
+      linhaEntrega.classList.toggle('d-none', retirada);
+      total.textContent = formatar(subtotal + (retirada ? 0 : taxa));
+    }
+    radios.forEach((radio) => radio.addEventListener('change', atualizarModalidade));
+    atualizarModalidade();
+  })();
+</script>
 {% endblock %}
