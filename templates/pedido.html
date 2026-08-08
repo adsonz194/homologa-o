@@ -10,6 +10,12 @@
         <p class="small text-muted mb-3">Codigo de acompanhamento: <code id="codigo-acompanhamento">{{ codigo_acompanhamento }}</code> <button class="btn btn-link btn-sm p-0 align-baseline" type="button" id="copiar-codigo">Copiar</button></p>
         <p class="mb-1"><strong>Total:</strong> R$ {{ '%.2f'|format(pedido.valor_total) }}</p>
         <p class="mb-4">Pagamento: <strong id="status-pagamento">{{ pedido.status_pagamento }}</strong></p>
+        {% if pedido.forma_pagamento == 'DINHEIRO' %}
+          <div class="alert alert-warning text-start small">Pagamento em <strong>dinheiro na entrega</strong>.<br>Valor informado: <strong>R$ {{ '%.2f'|format(pedido.valor_recebido) }}</strong> &middot; Troco: <strong>R$ {{ '%.2f'|format(pedido.troco) }}</strong>.</div>
+        {% endif %}
+        {% if pedido.modalidade_entrega == 'ENTREGA' and pedido.codigo_entrega %}
+          <div class="alert alert-primary text-start small"><strong>Codigo para confirmar a entrega: {{ pedido.codigo_entrega }}</strong><br>Informe este codigo somente ao entregador quando receber o pedido.</div>
+        {% endif %}
 
         <div class="tracking-box p-3 text-start">
           <p class="mb-1 text-muted small">Acompanhamento do delivery</p>
@@ -28,7 +34,7 @@
         </div>
         <a id="botao-whatsapp" class="btn btn-success mt-3 d-none" href="#">Falar com a empresa no WhatsApp</a>
         <a class="btn btn-outline-primary mt-3" href="{{ url_nota_pdf }}">Baixar comprovante em PDF</a>
-        {% if pedido.status_pagamento == 'PENDENTE' %}
+        {% if pedido.status_pagamento == 'PENDENTE' and pedido.forma_pagamento != 'DINHEIRO' %}
           <form method="post" action="{{ url_reiniciar_pagamento }}" class="mt-3">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button class="btn btn-outline-primary">Tentar pagamento novamente</button>

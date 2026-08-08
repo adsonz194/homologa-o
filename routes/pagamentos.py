@@ -232,6 +232,9 @@ def criar_checkout_pedido(pedido_id):
     pedido = obter_pedido(pedido_id)
     if pedido is None:
         return "Pedido nao encontrado", 404
+    if pedido["forma_pagamento"] == "DINHEIRO":
+        flash("Este pedido sera pago diretamente ao entregador.", "info")
+        return redirect(url_for("cliente.pedido", codigo=pedido["codigo_acompanhamento"]))
     autorizado_pela_sessao = session.get("pedido_pagamento_pendente") == pedido_id
     autorizado_por_comprovante = request.method == "POST" and autorizacao_pagamento_valida(
         pedido, request.form.get("autorizacao_pagamento", "")

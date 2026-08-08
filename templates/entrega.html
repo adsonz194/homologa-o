@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Confirmar entrega #{{ pedido.id }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-lg-7">
+  <div class="card shadow-sm"><div class="card-body p-4">
+    <p class="text-uppercase small text-muted fw-bold mb-1">Entrega do pedido</p>
+    <h1 class="h3 mb-4">#{{ pedido.id }} · {{ pedido.cliente }}</h1>
+    <div class="border rounded-3 p-3 mb-4">
+      <p class="mb-1"><strong>Telefone:</strong> {{ pedido.telefone }}</p>
+      <p class="mb-1"><strong>Endereco:</strong> {{ pedido.endereco }}</p>
+      <p class="mb-0"><strong>Total:</strong> R$ {{ '%.2f'|format(pedido.valor_total) }} · {{ pedido.forma_pagamento }}</p>
+      {% if pedido.forma_pagamento == 'DINHEIRO' %}<p class="mb-0 mt-2 text-success"><strong>Receber:</strong> R$ {{ '%.2f'|format(pedido.valor_recebido) }} · <strong>Troco:</strong> R$ {{ '%.2f'|format(pedido.troco) }}</p>{% endif %}
+    </div>
+    {% if pedido.status_operacional == 'ENTREGUE' %}
+      <div class="alert alert-success mb-0"><strong>Entrega confirmada.</strong>{% if pedido.entregue_em %} Registrada em {{ pedido.entregue_em }}.{% endif %}</div>
+    {% elif pedido.status_operacional in ['CANCELADO', 'EXTRAVIADO'] %}
+      <div class="alert alert-warning mb-0">Este pedido nao esta disponivel para confirmacao de entrega.</div>
+    {% else %}
+      <div class="alert alert-light border small">Peca ao cliente o codigo de 6 numeros exibido no comprovante. O codigo e necessario para concluir a entrega.</div>
+      <form method="post" class="row g-3" autocomplete="off">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="col-sm-7"><label class="form-label" for="codigo-entrega">Codigo de entrega</label><input id="codigo-entrega" class="form-control form-control-lg" name="codigo_entrega" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" required autofocus></div>
+        <div class="col-sm-5 d-flex align-items-end"><button class="btn btn-success btn-lg w-100">Confirmar entrega</button></div>
+      </form>
+    {% endif %}
+  </div></div>
+</div></div>
+{% endblock %}

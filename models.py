@@ -1,5 +1,7 @@
 import base64
 import hashlib
+import hmac
+import secrets
 from datetime import datetime, time
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
@@ -166,15 +168,15 @@ def obter_url_publica_estabelecimento(estabelecimento_id=None):
 
 
 def atualizar_configuracao_estabelecimento(
-    estabelecimento_id, nome, whatsapp, valor_entrega, url_publica, dias_funcionamento,
+    estabelecimento_id, nome, razao_social, cnpj, endereco, telefone, whatsapp, valor_entrega, url_publica, dias_funcionamento,
     horario_abertura, horario_encerramento, access_token="", webhook_secret=""
 ):
     """Atualiza configuracoes da loja sem devolver credenciais ao navegador."""
     campos = [
-        "nome = ?", "whatsapp = ?", "telefone = ?", "valor_entrega = ?", "url_publica = ?",
+        "nome = ?", "razao_social = ?", "cnpj = ?", "endereco = ?", "telefone = ?", "whatsapp = ?", "valor_entrega = ?", "url_publica = ?",
         "dias_funcionamento = ?", "horario_abertura = ?", "horario_encerramento = ?",
     ]
-    valores = [nome, whatsapp, whatsapp, valor_entrega, url_publica, dias_funcionamento, horario_abertura, horario_encerramento]
+    valores = [nome, razao_social, cnpj, endereco, telefone, whatsapp, valor_entrega, url_publica, dias_funcionamento, horario_abertura, horario_encerramento]
     if access_token:
         campos.append("mercadopago_token_criptografado = ?")
         valores.append(_criptografar_configuracao(access_token))
@@ -428,7 +430,15 @@ def detalhes_carrinho(carrinho, estabelecimento_id):
     return itens
 
 
-def criar_pedido(cliente, telefone, endereco, local_entrega, modalidade_entrega, email, forma_pagamento, carrinho, estabelecimento_id):
+def gerar_codigo_entrega():
+    """Codigo curto informado pelo cliente ao entregador no destino."""
+    return f"{secrets.randbelow(900_000) + 100_000}"
+
+
+def criar_pedido(
+    cliente, telefone, endereco, local_entrega, modalidade_entrega, email,
+    forma_pagamento, carrinho, estabelecimento_id, valor_recebido=None,
+):
     itens = detalhes_carrinho(carrinho, estabelecimento_id)
     if not itens:
         raise EstoqueInsuficiente("Carrinho vazio.")
@@ -445,12 +455,26 @@ def criar_pedido(cliente, telefone, endereco, local_entrega, modalidade_entrega,
                 raise EstoqueInsuficiente(f"{item['produto']['descricao']} nao possui estoque suficiente.")
             item["produto"] = produto
             total += item["subtotal"]
+        if forma_pagamento == "DINHEIRO":
+            if modalidade_entrega != "ENTREGA" or valor_recebido is None or valor_recebido < total:
+                raise ValueError("Informe um valor em dinheiro igual ou maior que o total do pedido.")
+            troco = round(valor_recebido - total, 2)
+            status_operacional = "FILA_DE_ESPERA"
+        else:
+            valor_recebido = None
+            troco = 0
+            status_operacional = "PENDENTE"
+        codigo_acompanhamento = gerar_codigo_acompanhamento(db)
+        codigo_entrega = gerar_codigo_entrega() if modalidade_entrega == "ENTREGA" else None
         cursor = db.execute(
             """INSERT INTO pedidos
                (cliente, telefone, endereco, local_entrega, modalidade_entrega, email, forma_pagamento, valor_total, valor_entrega,
-                codigo_acompanhamento, estabelecimento_id, estoque_reservado)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
-            (cliente, telefone, endereco, local_entrega, modalidade_entrega, email, forma_pagamento, total, valor_entrega, gerar_codigo_acompanhamento(db), estabelecimento_id),
+                valor_recebido, troco, codigo_acompanhamento, codigo_entrega, status_operacional, estabelecimento_id, estoque_reservado)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
+            (
+                cliente, telefone, endereco, local_entrega, modalidade_entrega, email, forma_pagamento, total, valor_entrega,
+                valor_recebido, troco, codigo_acompanhamento, codigo_entrega, status_operacional, estabelecimento_id,
+            ),
         )
         pedido_id = cursor.lastrowid
         for item in itens:
@@ -474,7 +498,12 @@ def obter_pedido_por_codigo(codigo):
 
 
 def itens_pedido(pedido_id):
-    return get_db().execute("SELECT * FROM pedido_itens WHERE pedido_id = ?", (pedido_id,)).fetchall()
+    return get_db().execute(
+        """SELECT pedido_itens.*, produtos.codigo_interno
+           FROM pedido_itens LEFT JOIN produtos ON produtos.id = pedido_itens.produto_id
+           WHERE pedido_itens.pedido_id = ?""",
+        (pedido_id,),
+    ).fetchall()
 
 
 def listar_pedidos(estabelecimento_id):
@@ -486,11 +515,13 @@ def listar_pedidos(estabelecimento_id):
 
 
 def listar_pedidos_aprovados_apos(estabelecimento_id, depois_id):
-    """Pedidos aprovados depois do ultimo ID visto pelo painel."""
+    """Pedidos recebidos pelo painel, inclusive dinheiro na entrega."""
     return get_db().execute(
         """SELECT id, cliente, valor_total, local_entrega
            FROM pedidos
-           WHERE estabelecimento_id = ? AND status_pagamento = 'APROVADO' AND id > ?
+           WHERE estabelecimento_id = ? AND id > ?
+             AND (status_pagamento = 'APROVADO'
+                  OR (forma_pagamento = 'DINHEIRO' AND status_operacional = 'FILA_DE_ESPERA'))
            ORDER BY id ASC LIMIT 30""",
         (estabelecimento_id, depois_id),
     ).fetchall()
@@ -512,39 +543,70 @@ def registrar_pix_pedido(pedido_id, mercadopago_order_id, payment_id, qr_code, q
     db.commit()
 
 
+def _atualizar_pagamento_pedido_no_banco(db, pedido, status, payment_id=None):
+    """Atualiza pagamento e estoque usando a mesma transacao SQLite."""
+    pedido_id = pedido["id"]
+    if status == "APROVADO" and not pedido["estoque_reservado"]:
+        # O carrinho e o pedido pendente nao reservam estoque. Esta atualizacao
+        # condicional impede que retorno do checkout e webhook baixem duas vezes.
+        baixa_confirmada = db.execute(
+            "UPDATE pedidos SET estoque_reservado = 1 WHERE id = ? AND estoque_reservado = 0",
+            (pedido_id,),
+        ).rowcount
+        if baixa_confirmada:
+            itens = db.execute("SELECT * FROM pedido_itens WHERE pedido_id = ?", (pedido_id,)).fetchall()
+            for item in itens:
+                db.execute(
+                    """UPDATE produtos SET estoque = estoque - ?
+                       WHERE id = ? AND estabelecimento_id = ?""",
+                    (item["quantidade"], item["produto_id"], pedido["estabelecimento_id"]),
+                )
+    if status in {"REJEITADO", "CANCELADO"} and pedido["estoque_reservado"]:
+        itens = db.execute("SELECT * FROM pedido_itens WHERE pedido_id = ?", (pedido_id,)).fetchall()
+        for item in itens:
+            db.execute("UPDATE produtos SET estoque = estoque + ? WHERE id = ?", (item["quantidade"], item["produto_id"]))
+        db.execute("UPDATE pedidos SET estoque_reservado = 0 WHERE id = ?", (pedido_id,))
+    if status == "APROVADO" and pedido["status_operacional"] == "PENDENTE":
+        db.execute(
+            "UPDATE pedidos SET status_operacional = 'FILA_DE_ESPERA' WHERE id = ?",
+            (pedido_id,),
+        )
+    db.execute(
+        "UPDATE pedidos SET status_pagamento = ?, payment_id = COALESCE(?, payment_id) WHERE id = ?",
+        (status, payment_id, pedido_id),
+    )
+
+
 def atualizar_pagamento_pedido(pedido_id, status, payment_id=None):
     db = get_db()
     with db:
-        pedido = obter_pedido(pedido_id)
+        pedido = db.execute("SELECT * FROM pedidos WHERE id = ?", (pedido_id,)).fetchone()
         if pedido is None:
             return
-        if status == "APROVADO" and not pedido["estoque_reservado"]:
-            # O carrinho e o pedido pendente nao reservam estoque. Esta atualizacao
-            # condicional impede que retorno do checkout e webhook baixem duas vezes.
-            baixa_confirmada = db.execute(
-                "UPDATE pedidos SET estoque_reservado = 1 WHERE id = ? AND estoque_reservado = 0",
-                (pedido_id,),
-            ).rowcount
-            if baixa_confirmada:
-                for item in itens_pedido(pedido_id):
-                    db.execute(
-                        """UPDATE produtos SET estoque = estoque - ?
-                           WHERE id = ? AND estabelecimento_id = ?""",
-                        (item["quantidade"], item["produto_id"], pedido["estabelecimento_id"]),
-                    )
-        if status in {"REJEITADO", "CANCELADO"} and pedido["estoque_reservado"]:
-            for item in itens_pedido(pedido_id):
-                db.execute("UPDATE produtos SET estoque = estoque + ? WHERE id = ?", (item["quantidade"], item["produto_id"]))
-            db.execute("UPDATE pedidos SET estoque_reservado = 0 WHERE id = ?", (pedido_id,))
-        if status == "APROVADO" and pedido["status_operacional"] == "PENDENTE":
-            db.execute(
-                "UPDATE pedidos SET status_operacional = 'FILA_DE_ESPERA' WHERE id = ?",
-                (pedido_id,),
-            )
+        _atualizar_pagamento_pedido_no_banco(db, pedido, status, payment_id)
+
+
+def confirmar_entrega_por_codigo(pedido_id, codigo_entrega):
+    """Confirma entrega no link publico depois de validar o codigo do cliente."""
+    codigo = "".join(caractere for caractere in str(codigo_entrega or "") if caractere.isdigit())
+    db = get_db()
+    with db:
+        pedido = db.execute("SELECT * FROM pedidos WHERE id = ?", (pedido_id,)).fetchone()
+        if pedido is None or pedido["modalidade_entrega"] != "ENTREGA":
+            return "NAO_ENCONTRADO"
+        if pedido["status_operacional"] == "ENTREGUE":
+            return "JA_ENTREGUE"
+        if pedido["status_operacional"] in {"CANCELADO", "EXTRAVIADO"}:
+            return "INDISPONIVEL"
+        if not pedido["codigo_entrega"] or not hmac.compare_digest(str(pedido["codigo_entrega"]), codigo):
+            return "CODIGO_INVALIDO"
+        if pedido["forma_pagamento"] == "DINHEIRO" and pedido["status_pagamento"] == "PENDENTE":
+            _atualizar_pagamento_pedido_no_banco(db, pedido, "APROVADO")
         db.execute(
-            "UPDATE pedidos SET status_pagamento = ?, payment_id = COALESCE(?, payment_id) WHERE id = ?",
-            (status, payment_id, pedido_id),
+            "UPDATE pedidos SET status_operacional = 'ENTREGUE', entregue_em = CURRENT_TIMESTAMP WHERE id = ?",
+            (pedido_id,),
         )
+    return "ENTREGUE"
 
 
 def liberar_estoque_pedido(pedido_id):
@@ -597,17 +659,49 @@ def limpar_tentativas_login(endereco_ip):
     db.commit()
 
 
+def quantidade_tentativas_entrega(pedido_id, endereco_ip, janela_segundos):
+    """Limita tentativas do codigo de entrega mesmo em um link publico."""
+    db = get_db()
+    db.execute("DELETE FROM tentativas_entrega WHERE criado_em < datetime('now', '-1 day')")
+    total = db.execute(
+        """SELECT COUNT(*) AS total FROM tentativas_entrega
+           WHERE pedido_id = ? AND endereco_ip = ?
+             AND criado_em >= datetime('now', ?)""",
+        (pedido_id, endereco_ip, f"-{janela_segundos} seconds"),
+    ).fetchone()["total"]
+    db.commit()
+    return total
+
+
+def registrar_tentativa_entrega(pedido_id, endereco_ip):
+    db = get_db()
+    db.execute(
+        "INSERT INTO tentativas_entrega (pedido_id, endereco_ip) VALUES (?, ?)",
+        (pedido_id, endereco_ip),
+    )
+    db.commit()
+
+
+def limpar_tentativas_entrega(pedido_id, endereco_ip):
+    db = get_db()
+    db.execute(
+        "DELETE FROM tentativas_entrega WHERE pedido_id = ? AND endereco_ip = ?",
+        (pedido_id, endereco_ip),
+    )
+    db.commit()
+
+
 def listar_funcionarios(estabelecimento_id):
     return get_db().execute(
-        "SELECT id, nome, usuario, papel, ativo, criado_em FROM usuarios WHERE estabelecimento_id = ? ORDER BY papel, nome COLLATE NOCASE", (estabelecimento_id,)
+        "SELECT id, nome, usuario, papel, permissoes, ativo, criado_em FROM usuarios WHERE estabelecimento_id = ? ORDER BY papel, nome COLLATE NOCASE", (estabelecimento_id,)
     ).fetchall()
 
 
-def criar_usuario(nome, usuario, senha_hash, papel="FUNCIONARIO", estabelecimento_id=None):
+def criar_usuario(nome, usuario, senha_hash, papel="FUNCIONARIO", estabelecimento_id=None, permissoes=""):
     db = get_db()
     cursor = db.execute(
-        "INSERT INTO usuarios (nome, usuario, senha_hash, papel, estabelecimento_id) VALUES (?, ?, ?, ?, ?)",
-        (nome, usuario, senha_hash, papel, estabelecimento_id),
+        "INSERT INTO usuarios (nome, usuario, senha_hash, papel, permissoes, estabelecimento_id) VALUES (?, ?, ?, ?, ?, ?)",
+        (nome, usuario, senha_hash, papel, permissoes, estabelecimento_id),
     )
     db.commit()
     return cursor.lastrowid

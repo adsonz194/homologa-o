@@ -12,16 +12,20 @@
 <body class="app-body">
   <header class="app-header">
     <nav class="container app-navbar d-flex flex-wrap">
-      <a class="brand me-auto" href="{{ url_for('pedidos.index') if usuario and usuario.papel != 'DONO' else url_for('vendas.index') if usuario else url_for('cliente.loja') }}"><span class="brand-mark">&#128722;</span><span>Menino dos Sonhos</span></a>
+      <a class="brand me-auto" href="{{ rota_inicial_painel if usuario else url_for('cliente.loja') }}"><span class="brand-mark">&#128722;</span><span>Menino dos Sonhos</span></a>
       <div class="nav-actions{% if usuario %} painel-nav{% endif %}">
         {% if usuario %}
-          <a class="btn btn-outline-light btn-sm" href="{{ url_for('pedidos.index') }}">Pedidos</a>
+          {% if usuario.papel == 'DONO' or 'PEDIDOS' in permissoes_usuario %}<a class="btn btn-outline-light btn-sm" href="{{ url_for('pedidos.index') }}">Pedidos</a>{% endif %}
           {% if usuario.papel == 'DONO' %}
             <a class="btn btn-outline-light btn-sm" href="{{ url_for('vendas.index') }}">Vendas</a>
-            <a class="btn btn-outline-light btn-sm" href="{{ url_for('vendas.relatorio') }}">Relatório</a>
+            <a class="btn btn-outline-light btn-sm" href="{{ url_for('vendas.relatorio') }}">Relatorio</a>
             <a class="btn btn-outline-light btn-sm" href="{{ url_for('produtos.index') }}">Produtos</a>
             <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.usuarios') }}">Funcionarios</a>
             <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.configuracoes') }}">Configuracoes</a>
+          {% else %}
+            {% if 'VENDAS' in permissoes_usuario %}<a class="btn btn-outline-light btn-sm" href="{{ url_for('vendas.index') }}">Vendas</a>{% endif %}
+            {% if 'RELATORIOS' in permissoes_usuario %}<a class="btn btn-outline-light btn-sm" href="{{ url_for('vendas.relatorio') }}">Relatorio</a>{% endif %}
+            {% if 'PRODUTOS' in permissoes_usuario %}<a class="btn btn-outline-light btn-sm" href="{{ url_for('produtos.index') }}">Produtos</a>{% endif %}
           {% endif %}
           <span class="user-label d-none d-lg-inline">{{ usuario.nome }} &middot; {{ usuario.papel|lower }}</span>
           <form method="post" action="{{ url_for('auth.sair') }}"><button class="btn btn-light btn-sm">Sair</button></form>
@@ -34,9 +38,7 @@
   </header>
   <main class="container app-shell">
     {% with mensagens = get_flashed_messages(with_categories=true) %}
-      {% for categoria, mensagem in mensagens %}
-        <div class="alert alert-{{ categoria }}">{{ mensagem }}</div>
-      {% endfor %}
+      {% for categoria, mensagem in mensagens %}<div class="alert alert-{{ categoria }}">{{ mensagem }}</div>{% endfor %}
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
@@ -47,8 +49,7 @@
       document.querySelectorAll('form[method="post"]').forEach((form) => {
         if (!form.querySelector('input[name="csrf_token"]')) {
           const input = document.createElement('input');
-          input.type = 'hidden'; input.name = 'csrf_token'; input.value = token;
-          form.appendChild(input);
+          input.type = 'hidden'; input.name = 'csrf_token'; input.value = token; form.appendChild(input);
         }
       });
     })();

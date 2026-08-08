@@ -12,7 +12,7 @@ from models import (
     obter_produto,
     substituir_complementos_produto,
 )
-from routes.auth import owner_required
+from routes.auth import permission_required
 
 produtos_bp = Blueprint("produtos", __name__)
 
@@ -56,13 +56,13 @@ def dados_complementos_do_formulario():
 
 
 @produtos_bp.get("/produtos")
-@owner_required
+@permission_required("PRODUTOS")
 def index():
     return render_template("produtos.html", produtos=listar_produtos(g.usuario["estabelecimento_id"]))
 
 
 @produtos_bp.route("/produtos/novo", methods=["GET", "POST"])
-@owner_required
+@permission_required("PRODUTOS")
 def novo():
     if request.method == "GET":
         return render_template("produto.html", produto=None, complementos=[])
@@ -81,7 +81,7 @@ def novo():
 
 
 @produtos_bp.route("/produtos/<int:produto_id>/editar", methods=["GET", "POST"])
-@owner_required
+@permission_required("PRODUTOS")
 def editar(produto_id):
     produto = obter_produto(produto_id, g.usuario["estabelecimento_id"])
     if produto is None:
@@ -103,7 +103,7 @@ def editar(produto_id):
 
 
 @produtos_bp.get("/api/produtos/buscar")
-@owner_required
+@permission_required("PRODUTOS")
 def buscar():
     consulta = request.args.get("q", "").strip()
     if not consulta:

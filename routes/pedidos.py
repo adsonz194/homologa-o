@@ -13,7 +13,7 @@ from models import (
     obter_pedido,
 )
 from nota_pdf import gerar_comprovante_pedido_pdf
-from routes.auth import login_required
+from routes.auth import permission_required
 from routes.pagamentos import MercadoPagoError, cancelar_cobranca_pedido, reembolsar_pedido
 
 pedidos_bp = Blueprint("pedidos", __name__)
@@ -27,11 +27,15 @@ STATUS_OPERACIONAIS_FUNCIONARIO = {
 
 
 @pedidos_bp.get("/pedidos")
-@login_required
+@permission_required("PEDIDOS")
 def index():
     pedidos = listar_pedidos(g.usuario["estabelecimento_id"])
     ultimo_pedido_aprovado = max(
-        (pedido["id"] for pedido in pedidos if pedido["status_pagamento"] == "APROVADO"), default=0
+        (
+            pedido["id"] for pedido in pedidos
+            if pedido["status_pagamento"] == "APROVADO"
+            or (pedido["forma_pagamento"] == "DINHEIRO" and pedido["status_operacional"] == "FILA_DE_ESPERA")
+        ), default=0
     )
     return render_template(
         "pedidos.html", pedidos=pedidos, ultimo_pedido_aprovado=ultimo_pedido_aprovado,
@@ -40,7 +44,7 @@ def index():
 
 
 @pedidos_bp.get("/pedidos/notificacoes")
-@login_required
+@permission_required("PEDIDOS")
 def notificacoes():
     try:
         depois_id = max(0, int(request.args.get("depois", "0")))
@@ -54,7 +58,7 @@ def notificacoes():
 
 
 @pedidos_bp.get("/pedidos/<int:pedido_id>/nota.pdf")
-@login_required
+@permission_required("PEDIDOS")
 def nota_pdf(pedido_id):
     pedido = obter_pedido(pedido_id)
     if pedido is None or pedido["estabelecimento_id"] != g.usuario["estabelecimento_id"]:
@@ -73,7 +77,7 @@ def nota_pdf(pedido_id):
 
 
 @pedidos_bp.post("/pedidos/<int:pedido_id>/status")
-@login_required
+@permission_required("PEDIDOS")
 def atualizar_status(pedido_id):
     pedido = obter_pedido(pedido_id)
     if pedido is not None and pedido["estabelecimento_id"] != g.usuario["estabelecimento_id"]:
@@ -90,12 +94,22 @@ def atualizar_status(pedido_id):
     ):
         flash("Funcionarios nao podem cancelar, extraviar ou reabrir pedidos finalizados.", "danger")
         return redirect(url_for("pedidos.index"))
+    if (
+        status == "ENTREGUE" and pedido["forma_pagamento"] == "DINHEIRO"
+        and pedido["status_pagamento"] != "APROVADO"
+    ):
+        flash("Confirme a entrega em dinheiro pelo link do entregador e pelo codigo do cliente.", "warning")
+        return redirect(url_for("pedidos.index"))
     if status == "CANCELADO" and pedido["status_operacional"] != "CANCELADO":
         try:
             if pedido["status_pagamento"] == "APROVADO":
-                reembolsar_pedido(pedido)
+                if pedido["forma_pagamento"] != "DINHEIRO":
+                    reembolsar_pedido(pedido)
                 atualizar_pagamento_pedido(pedido_id, "CANCELADO")
-                flash("Pedido cancelado e estorno solicitado ao Mercado Pago.", "success")
+                if pedido["forma_pagamento"] == "DINHEIRO":
+                    flash("Pedido em dinheiro cancelado. Se ja recebeu o valor, faca a devolucao manualmente.", "success")
+                else:
+                    flash("Pedido cancelado e estorno solicitado ao Mercado Pago.", "success")
             else:
                 cancelar_cobranca_pedido(pedido)
                 atualizar_pagamento_pedido(pedido_id, "CANCELADO")

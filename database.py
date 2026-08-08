@@ -33,6 +33,9 @@ def init_db():
     db.execute("""CREATE TABLE IF NOT EXISTS estabelecimentos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT NOT NULL,
+        razao_social TEXT NOT NULL DEFAULT '',
+        cnpj TEXT NOT NULL DEFAULT '',
+        endereco TEXT NOT NULL DEFAULT '',
         slug TEXT NOT NULL UNIQUE COLLATE NOCASE,
         telefone TEXT NOT NULL DEFAULT '',
         whatsapp TEXT NOT NULL DEFAULT '',
@@ -77,6 +80,7 @@ def init_db():
         usuario TEXT NOT NULL UNIQUE COLLATE NOCASE,
         senha_hash TEXT NOT NULL,
         papel TEXT NOT NULL CHECK(papel IN ('DONO', 'FUNCIONARIO')),
+        permissoes TEXT NOT NULL DEFAULT '',
         ativo INTEGER NOT NULL DEFAULT 1,
         criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )""")
@@ -102,6 +106,12 @@ def init_db():
         email TEXT NOT NULL DEFAULT '',
         pix_qr_code TEXT,
         pix_qr_code_base64 TEXT,
+        valor_entrega REAL NOT NULL DEFAULT 0,
+        valor_recebido REAL,
+        troco REAL NOT NULL DEFAULT 0,
+        codigo_acompanhamento TEXT,
+        codigo_entrega TEXT,
+        entregue_em TEXT,
         estoque_reservado INTEGER NOT NULL DEFAULT 0,
         criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )""")
@@ -114,6 +124,13 @@ def init_db():
         valor_unitario REAL NOT NULL,
         FOREIGN KEY(pedido_id) REFERENCES pedidos(id),
         FOREIGN KEY(produto_id) REFERENCES produtos(id)
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS tentativas_entrega (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pedido_id INTEGER NOT NULL,
+        endereco_ip TEXT NOT NULL,
+        criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE
     )""")
     estabelecimento_padrao = db.execute(
         "SELECT id FROM estabelecimentos WHERE slug = ? COLLATE NOCASE",
@@ -156,6 +173,12 @@ def init_db():
         )
     if "fechado_hoje_data" not in colunas_estabelecimentos:
         db.execute("ALTER TABLE estabelecimentos ADD COLUMN fechado_hoje_data TEXT")
+    if "razao_social" not in colunas_estabelecimentos:
+        db.execute("ALTER TABLE estabelecimentos ADD COLUMN razao_social TEXT NOT NULL DEFAULT ''")
+    if "cnpj" not in colunas_estabelecimentos:
+        db.execute("ALTER TABLE estabelecimentos ADD COLUMN cnpj TEXT NOT NULL DEFAULT ''")
+    if "endereco" not in colunas_estabelecimentos:
+        db.execute("ALTER TABLE estabelecimentos ADD COLUMN endereco TEXT NOT NULL DEFAULT ''")
     colunas_vendas = {coluna["name"] for coluna in db.execute("PRAGMA table_info(vendas)")}
     if "produto_id" not in colunas_vendas:
         db.execute("ALTER TABLE vendas ADD COLUMN produto_id INTEGER")
@@ -193,9 +216,19 @@ def init_db():
         db.execute("ALTER TABLE pedidos ADD COLUMN modalidade_entrega TEXT NOT NULL DEFAULT 'ENTREGA'")
     if "estabelecimento_id" not in colunas_pedidos:
         db.execute("ALTER TABLE pedidos ADD COLUMN estabelecimento_id INTEGER")
+    if "valor_recebido" not in colunas_pedidos:
+        db.execute("ALTER TABLE pedidos ADD COLUMN valor_recebido REAL")
+    if "troco" not in colunas_pedidos:
+        db.execute("ALTER TABLE pedidos ADD COLUMN troco REAL NOT NULL DEFAULT 0")
+    if "codigo_entrega" not in colunas_pedidos:
+        db.execute("ALTER TABLE pedidos ADD COLUMN codigo_entrega TEXT")
+    if "entregue_em" not in colunas_pedidos:
+        db.execute("ALTER TABLE pedidos ADD COLUMN entregue_em TEXT")
     colunas_usuarios = {coluna["name"] for coluna in db.execute("PRAGMA table_info(usuarios)")}
     if "estabelecimento_id" not in colunas_usuarios:
         db.execute("ALTER TABLE usuarios ADD COLUMN estabelecimento_id INTEGER")
+    if "permissoes" not in colunas_usuarios:
+        db.execute("ALTER TABLE usuarios ADD COLUMN permissoes TEXT NOT NULL DEFAULT ''")
     for tabela in ("vendas", "produtos", "pedidos", "usuarios"):
         db.execute(
             f"UPDATE {tabela} SET estabelecimento_id = ? WHERE estabelecimento_id IS NULL",
@@ -216,6 +249,7 @@ def init_db():
     db.execute("CREATE INDEX IF NOT EXISTS idx_pedidos_estabelecimento ON pedidos(estabelecimento_id, id)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_usuarios_estabelecimento ON usuarios(estabelecimento_id, usuario)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_tentativas_login_ip_data ON tentativas_login(endereco_ip, criado_em)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_tentativas_entrega_pedido_ip_data ON tentativas_entrega(pedido_id, endereco_ip, criado_em)")
     db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_pedidos_codigo_acompanhamento ON pedidos(codigo_acompanhamento)")
     db.commit()
 

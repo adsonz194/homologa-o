@@ -5,7 +5,7 @@ from flask import Flask, abort, g, render_template, request, session
 from werkzeug.middleware.proxy_fix import ProxyFix
 from config import Config
 from database import init_app as init_database
-from routes.auth import auth_bp
+from routes.auth import auth_bp, permissoes_usuario, rota_inicial_painel
 from routes.cliente import cliente_bp
 from routes.pagamentos import pagamentos_bp
 from routes.pedidos import pedidos_bp
@@ -76,7 +76,13 @@ def create_app():
     def disponibilizar_usuario():
         if "csrf_token" not in session:
             session["csrf_token"] = secrets.token_urlsafe(32)
-        return {"usuario": getattr(g, "usuario", None), "csrf_token": session["csrf_token"]}
+        usuario = getattr(g, "usuario", None)
+        return {
+            "usuario": usuario,
+            "permissoes_usuario": permissoes_usuario(usuario),
+            "rota_inicial_painel": rota_inicial_painel(usuario),
+            "csrf_token": session["csrf_token"],
+        }
 
     @app.get("/healthz")
     def healthz():

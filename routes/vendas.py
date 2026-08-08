@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
-from routes.auth import owner_required
+from routes.auth import permission_required
 from models import (
     EstoqueInsuficiente, criar_venda, data_hora_loja, listar_vendas,
     obter_estabelecimento, obter_produto, obter_venda, relatorio_vendas,
@@ -16,13 +16,13 @@ def inicio():
 
 
 @vendas_bp.get("/painel/vendas")
-@owner_required
+@permission_required("VENDAS")
 def index():
     return render_template("index.html", vendas=listar_vendas(g.usuario["estabelecimento_id"]))
 
 
 @vendas_bp.get("/painel/relatorio-vendas")
-@owner_required
+@permission_required("RELATORIOS")
 def relatorio():
     hoje = data_hora_loja().date()
     try:
@@ -46,7 +46,7 @@ def relatorio():
     )
 
 @vendas_bp.route("/vendas/nova", methods=["GET", "POST"])
-@owner_required
+@permission_required("VENDAS")
 def nova_venda():
     if request.method == "GET":
         return render_template("venda.html")
@@ -82,7 +82,7 @@ def nova_venda():
     )
 
 @vendas_bp.get("/vendas/<int:venda_id>/sucesso")
-@owner_required
+@permission_required("VENDAS")
 def sucesso(venda_id):
     venda = obter_venda(venda_id, g.usuario["estabelecimento_id"])
     if venda is None: return "Venda não encontrada", 404

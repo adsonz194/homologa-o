@@ -1,4 +1,5 @@
 from io import BytesIO
+import math
 
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, send_file, session, url_for
 
@@ -6,6 +7,7 @@ from models import (
     EstoqueInsuficiente,
     LOCAIS_ENTREGA,
     complementos_selecionados,
+    confirmar_entrega_por_codigo,
     criar_pedido,
     detalhes_carrinho,
     itens_pedido,
@@ -18,6 +20,9 @@ from models import (
     obter_pedido,
     obter_pedido_por_codigo,
     obter_produto,
+    quantidade_tentativas_entrega,
+    registrar_tentativa_entrega,
+    limpar_tentativas_entrega,
     local_entrega_por_codigo,
     status_entrega_local,
     status_funcionamento_estabelecimento,
@@ -25,7 +30,7 @@ from models import (
 from nota_pdf import gerar_comprovante_pedido_pdf
 
 cliente_bp = Blueprint("cliente", __name__)
-FORMAS_PAGAMENTO = {"PIX", "CREDITO", "DEBITO"}
+FORMAS_PAGAMENTO = {"PIX", "CREDITO", "DEBITO", "DINHEIRO"}
 MODALIDADES_ENTREGA = {"ENTREGA", "RETIRADA"}
 STATUS_OPERACIONAL_NOMES = {
     "PENDENTE": "Aguardando confirmacao do pagamento",
@@ -37,6 +42,16 @@ STATUS_OPERACIONAL_NOMES = {
     "CANCELADO": "Cancelado",
     "EXTRAVIADO": "Pedido extraviado",
 }
+
+
+def _valor_monetario(texto):
+    valor = str(texto or "").strip().replace("R$", "").replace(" ", "")
+    if "," in valor:
+        valor = valor.replace(".", "").replace(",", ".")
+    resultado = round(float(valor), 2)
+    if not math.isfinite(resultado) or resultado < 0:
+        raise ValueError
+    return resultado
 
 
 def carrinho_atual():
@@ -238,6 +253,7 @@ def finalizar():
     local = local_entrega_por_codigo(codigo_local)
     modalidade_entrega = request.form.get("modalidade_entrega", "ENTREGA")
     forma_pagamento = request.form.get("forma_pagamento", "")
+    valor_recebido = None
     telefone_numeros = "".join(caractere for caractere in telefone if caractere.isdigit())
     if (
         not 2 <= len(cliente) <= 100
@@ -259,15 +275,28 @@ def finalizar():
     else:
         endereco = "Retirada na loja"
         local_entrega = "Retirada na loja"
+    total_cobravel = subtotal + (estabelecimento["valor_entrega"] if modalidade_entrega == "ENTREGA" else 0)
+    if forma_pagamento == "DINHEIRO":
+        try:
+            valor_recebido = _valor_monetario(request.form.get("valor_recebido", ""))
+        except (TypeError, ValueError):
+            valor_recebido = -1
+        if modalidade_entrega != "ENTREGA" or valor_recebido < total_cobravel:
+            flash("Para pagamento em dinheiro, informe um valor igual ou maior que o total da entrega.", "danger")
+            return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=LOCAIS_ENTREGA), 400
     try:
         pedido_id = criar_pedido(
             cliente, telefone, endereco, local_entrega, modalidade_entrega, "", forma_pagamento,
-            carrinho_atual(), estabelecimento["id"],
+            carrinho_atual(), estabelecimento["id"], valor_recebido,
         )
-    except EstoqueInsuficiente as erro:
+    except (EstoqueInsuficiente, ValueError) as erro:
         flash(str(erro), "danger")
         return redirect(url_for("cliente.carrinho"))
     session.pop("carrinho", None)
+    pedido = obter_pedido(pedido_id)
+    if forma_pagamento == "DINHEIRO":
+        flash("Pedido registrado. O entregador levara o troco informado.", "success")
+        return redirect(url_for("cliente.pedido", codigo=pedido["codigo_acompanhamento"]))
     session["pedido_pagamento_pendente"] = pedido_id
     # Mantemos o mesmo encadeamento HTTP simples que era usado no checkout
     # original: formulario -> rota do checkout -> Mercado Pago. Nao ha pagina
@@ -281,7 +310,7 @@ def iniciar_pagamento(pedido_id):
         flash("Para sua seguranca, inicie o pagamento a partir do seu carrinho ou codigo de acompanhamento.", "warning")
         return redirect(url_for("cliente.loja"))
     pedido_atual = obter_pedido(pedido_id)
-    if pedido_atual is None or pedido_atual["status_pagamento"] != "PENDENTE":
+    if pedido_atual is None or pedido_atual["status_pagamento"] != "PENDENTE" or pedido_atual["forma_pagamento"] == "DINHEIRO":
         flash("Este pedido nao esta disponivel para um novo pagamento.", "warning")
         return redirect(url_for("cliente.loja"))
     return redirect(url_for("pagamentos.criar_checkout_pedido", pedido_id=pedido_id))
@@ -301,6 +330,10 @@ def renderizar_pedido(pedido_atual, retorno_checkout=False):
         ),
         url_reiniciar_pagamento=url_for("cliente.reiniciar_pagamento", codigo=codigo),
         url_nota_pdf=url_for("cliente.nota_pdf", codigo=codigo),
+        url_entrega=(
+            f"{obter_url_publica_estabelecimento(pedido_atual['estabelecimento_id'])}"
+            f"{url_for('cliente.confirmar_entrega', codigo=codigo)}"
+        ) if pedido_atual["modalidade_entrega"] == "ENTREGA" else "",
         whatsapp_empresa=obter_whatsapp_estabelecimento(pedido_atual["estabelecimento_id"]),
         retorno_checkout=retorno_checkout,
     )
@@ -388,12 +421,39 @@ def status_pedido(codigo):
     })
 
 
+@cliente_bp.route("/entrega/<codigo>", methods=["GET", "POST"])
+def confirmar_entrega(codigo):
+    """Link publico do entregador: confirma somente com o codigo do cliente."""
+    pedido_atual = obter_pedido_por_codigo(codigo)
+    if pedido_atual is None or pedido_atual["modalidade_entrega"] != "ENTREGA":
+        return "Entrega nao encontrada", 404
+    if request.method == "POST":
+        endereco_ip = request.remote_addr or "desconhecido"
+        if quantidade_tentativas_entrega(pedido_atual["id"], endereco_ip, 900) >= 5:
+            return "Muitas tentativas de codigo. Aguarde alguns minutos e tente novamente.", 429
+        resultado = confirmar_entrega_por_codigo(pedido_atual["id"], request.form.get("codigo_entrega", ""))
+        if resultado == "ENTREGUE":
+            limpar_tentativas_entrega(pedido_atual["id"], endereco_ip)
+            flash("Entrega confirmada com sucesso.", "success")
+            return redirect(url_for("cliente.confirmar_entrega", codigo=pedido_atual["codigo_acompanhamento"]))
+        if resultado == "CODIGO_INVALIDO":
+            registrar_tentativa_entrega(pedido_atual["id"], endereco_ip)
+            flash("Codigo de entrega invalido. Confira com o cliente.", "danger")
+        elif resultado == "JA_ENTREGUE":
+            flash("Esta entrega ja foi confirmada.", "info")
+        else:
+            flash("Esta entrega nao pode mais ser confirmada.", "warning")
+        return redirect(url_for("cliente.confirmar_entrega", codigo=pedido_atual["codigo_acompanhamento"]))
+    estabelecimento = obter_estabelecimento(pedido_atual["estabelecimento_id"])
+    return render_template("entrega.html", pedido=pedido_atual, estabelecimento=estabelecimento)
+
+
 @cliente_bp.post("/cliente/acompanhamento/<codigo>/pagar")
 def reiniciar_pagamento(codigo):
     pedido_atual = obter_pedido_por_codigo(codigo)
     if pedido_atual is None:
         return "Pedido nao encontrado", 404
-    if pedido_atual["status_pagamento"] != "PENDENTE":
+    if pedido_atual["status_pagamento"] != "PENDENTE" or pedido_atual["forma_pagamento"] == "DINHEIRO":
         flash("Este pedido nao esta aguardando um novo pagamento.", "warning")
         return redirect(url_for("cliente.pedido", codigo=pedido_atual["codigo_acompanhamento"]))
     session["pedido_pagamento_pendente"] = pedido_atual["id"]
