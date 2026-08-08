@@ -10,6 +10,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from models import (
     atualizar_configuracao_estabelecimento,
     criar_usuario,
+    definir_usuario_ativo,
     definir_fechado_hoje,
     limpar_tentativas_login,
     listar_funcionarios,
@@ -189,6 +190,16 @@ def sair():
 @owner_required
 def usuarios():
     return render_template("usuarios.html", usuarios=listar_funcionarios(g.usuario["estabelecimento_id"]))
+
+
+@auth_bp.post("/usuarios/<int:usuario_id>/acesso")
+@owner_required
+def alterar_acesso_usuario(usuario_id):
+    ativo = request.form.get("acao") == "reativar"
+    if not definir_usuario_ativo(usuario_id, g.usuario["estabelecimento_id"], ativo):
+        return "Funcionario nao encontrado", 404
+    flash("Funcionario reativado." if ativo else "Funcionario desativado e sem acesso ao painel.", "success")
+    return redirect(url_for("auth.usuarios"))
 
 
 @auth_bp.route("/configuracoes", methods=["GET", "POST"])

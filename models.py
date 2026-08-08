@@ -707,5 +707,17 @@ def criar_usuario(nome, usuario, senha_hash, papel="FUNCIONARIO", estabeleciment
     return cursor.lastrowid
 
 
+def definir_usuario_ativo(usuario_id, estabelecimento_id, ativo):
+    """Desativa ou reativa somente contas de funcionario, sem apagar historico."""
+    db = get_db()
+    cursor = db.execute(
+        """UPDATE usuarios SET ativo = ?
+           WHERE id = ? AND estabelecimento_id = ? AND papel = 'FUNCIONARIO'""",
+        (int(bool(ativo)), usuario_id, estabelecimento_id),
+    )
+    db.commit()
+    return cursor.rowcount == 1
+
+
 def existe_dono():
     return get_db().execute("SELECT 1 FROM usuarios WHERE papel = 'DONO' LIMIT 1").fetchone() is not None
