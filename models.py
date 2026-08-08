@@ -719,5 +719,32 @@ def definir_usuario_ativo(usuario_id, estabelecimento_id, ativo):
     return cursor.rowcount == 1
 
 
+def obter_funcionario(usuario_id, estabelecimento_id):
+    return get_db().execute(
+        """SELECT id, nome, usuario, papel, permissoes, ativo, criado_em
+           FROM usuarios
+           WHERE id = ? AND estabelecimento_id = ? AND papel = 'FUNCIONARIO'""",
+        (usuario_id, estabelecimento_id),
+    ).fetchone()
+
+
+def atualizar_funcionario(usuario_id, estabelecimento_id, nome, usuario, permissoes, senha_hash=None):
+    """Edita dados e permissoes sem permitir alterar a conta do dono."""
+    db = get_db()
+    campos = ["nome = ?", "usuario = ?", "permissoes = ?"]
+    valores = [nome, usuario, permissoes]
+    if senha_hash:
+        campos.append("senha_hash = ?")
+        valores.append(senha_hash)
+    valores.extend([usuario_id, estabelecimento_id])
+    cursor = db.execute(
+        f"""UPDATE usuarios SET {', '.join(campos)}
+            WHERE id = ? AND estabelecimento_id = ? AND papel = 'FUNCIONARIO'""",
+        valores,
+    )
+    db.commit()
+    return cursor.rowcount == 1
+
+
 def existe_dono():
     return get_db().execute("SELECT 1 FROM usuarios WHERE papel = 'DONO' LIMIT 1").fetchone() is not None

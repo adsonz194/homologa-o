@@ -9,12 +9,14 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from models import (
     atualizar_configuracao_estabelecimento,
+    atualizar_funcionario,
     criar_usuario,
     definir_usuario_ativo,
     definir_fechado_hoje,
     limpar_tentativas_login,
     listar_funcionarios,
     obter_estabelecimento,
+    obter_funcionario,
     obter_segredo_webhook_mercadopago,
     obter_token_mercadopago,
     obter_usuario_por_nome,
@@ -199,6 +201,52 @@ def alterar_acesso_usuario(usuario_id):
     if not definir_usuario_ativo(usuario_id, g.usuario["estabelecimento_id"], ativo):
         return "Funcionario nao encontrado", 404
     flash("Funcionario reativado." if ativo else "Funcionario desativado e sem acesso ao painel.", "success")
+    return redirect(url_for("auth.usuarios"))
+
+
+@auth_bp.route("/usuarios/<int:usuario_id>/editar", methods=["GET", "POST"])
+@owner_required
+def editar_usuario(usuario_id):
+    funcionario = obter_funcionario(usuario_id, g.usuario["estabelecimento_id"])
+    if funcionario is None:
+        return "Funcionario nao encontrado", 404
+    if request.method == "GET":
+        return render_template(
+            "editar_usuario.html", funcionario=funcionario,
+            permissoes_disponiveis=PERMISSOES_FUNCIONARIO,
+            permissoes_selecionadas=permissoes_usuario(funcionario),
+        )
+    try:
+        nome = request.form["nome"].strip()
+        usuario = request.form["usuario"].strip()
+        senha = request.form.get("senha", "")
+        permissoes = sorted({
+            permissao for permissao in request.form.getlist("permissoes")
+            if permissao in CODIGOS_PERMISSOES_FUNCIONARIO
+        })
+        if not nome or not re.fullmatch(r"[A-Za-z0-9_.-]{3,50}", usuario) or (senha and len(senha) < 12):
+            raise ValueError
+        senha_hash = generate_password_hash(senha) if senha else None
+        if not atualizar_funcionario(
+            funcionario["id"], g.usuario["estabelecimento_id"], nome, usuario,
+            ",".join(permissoes), senha_hash,
+        ):
+            return "Funcionario nao encontrado", 404
+    except (KeyError, ValueError):
+        flash("Confira nome, usuario e senha. A senha, se alterada, precisa ter ao menos 12 caracteres.", "danger")
+        return render_template(
+            "editar_usuario.html", funcionario=funcionario,
+            permissoes_disponiveis=PERMISSOES_FUNCIONARIO,
+            permissoes_selecionadas=set(request.form.getlist("permissoes")),
+        ), 400
+    except sqlite3.IntegrityError:
+        flash("Este nome de usuario ja esta em uso.", "danger")
+        return render_template(
+            "editar_usuario.html", funcionario=funcionario,
+            permissoes_disponiveis=PERMISSOES_FUNCIONARIO,
+            permissoes_selecionadas=set(request.form.getlist("permissoes")),
+        ), 400
+    flash("Funcionario atualizado com sucesso.", "success")
     return redirect(url_for("auth.usuarios"))
 
 
