@@ -14,15 +14,20 @@ from models import (
     atualizar_configuracao_estabelecimento,
     atualizar_email_recuperacao,
     atualizar_funcionario,
+    atualizar_local_entrega,
     criar_recuperacao_senha,
+    criar_local_entrega,
     criar_usuario,
     definir_usuario_ativo,
     definir_fechado_hoje,
+    definir_local_entrega_ativo,
     limpar_tentativas_login,
     email_recuperacao_em_uso,
     email_recuperacao_valido,
+    excluir_local_entrega,
     invalidar_recuperacoes_senha,
     listar_funcionarios,
+    listar_locais_entrega,
     obter_estabelecimento,
     obter_funcionario,
     obter_segredo_webhook_mercadopago,
@@ -62,6 +67,15 @@ def _valor_monetario(texto):
 
 def _horario_valido(texto):
     return datetime.strptime(texto, "%H:%M").strftime("%H:%M")
+
+
+def _dados_local_entrega(formulario):
+    nome = " ".join(formulario.get("nome", "").split())
+    horario_abertura = _horario_valido(formulario.get("horario_abertura", ""))
+    horario = _horario_valido(formulario.get("horario_encerramento", ""))
+    if not 2 <= len(nome) <= 80:
+        raise ValueError
+    return nome, horario_abertura, horario
 
 
 def _cnpj_valido(cnpj):
@@ -351,6 +365,63 @@ def editar_usuario(usuario_id):
         ), 400
     flash("Funcionario atualizado com sucesso.", "success")
     return redirect(url_for("auth.usuarios"))
+
+
+@auth_bp.get("/configuracoes/locais")
+@owner_required
+def locais_entrega():
+    return render_template(
+        "locais_entrega.html",
+        locais=listar_locais_entrega(g.usuario["estabelecimento_id"]),
+    )
+
+
+@auth_bp.post("/configuracoes/locais")
+@owner_required
+def novo_local_entrega():
+    try:
+        nome, horario_abertura, horario = _dados_local_entrega(request.form)
+        criar_local_entrega(g.usuario["estabelecimento_id"], nome, horario_abertura, horario)
+        flash("Local de entrega cadastrado.", "success")
+    except (TypeError, ValueError):
+        flash("Informe um local com 2 a 80 caracteres e um horario valido.", "danger")
+    except sqlite3.IntegrityError:
+        flash("Este local ja esta cadastrado.", "danger")
+    return redirect(url_for("auth.locais_entrega"))
+
+
+@auth_bp.post("/configuracoes/locais/<int:local_id>/editar")
+@owner_required
+def editar_local_entrega(local_id):
+    try:
+        nome, horario_abertura, horario = _dados_local_entrega(request.form)
+        if not atualizar_local_entrega(local_id, g.usuario["estabelecimento_id"], nome, horario_abertura, horario):
+            return "Local nao encontrado", 404
+        flash("Local de entrega atualizado.", "success")
+    except (TypeError, ValueError):
+        flash("Informe um local com 2 a 80 caracteres e um horario valido.", "danger")
+    except sqlite3.IntegrityError:
+        flash("Ja existe outro local com este nome.", "danger")
+    return redirect(url_for("auth.locais_entrega"))
+
+
+@auth_bp.post("/configuracoes/locais/<int:local_id>/acesso")
+@owner_required
+def alterar_acesso_local_entrega(local_id):
+    ativo = request.form.get("acao") == "ativar"
+    if not definir_local_entrega_ativo(local_id, g.usuario["estabelecimento_id"], ativo):
+        return "Local nao encontrado", 404
+    flash("Local liberado para pedidos." if ativo else "Local pausado para novos pedidos.", "success")
+    return redirect(url_for("auth.locais_entrega"))
+
+
+@auth_bp.post("/configuracoes/locais/<int:local_id>/excluir")
+@owner_required
+def excluir_local_entrega_rota(local_id):
+    if not excluir_local_entrega(local_id, g.usuario["estabelecimento_id"]):
+        return "Local nao encontrado", 404
+    flash("Local de entrega excluido. Pedidos antigos continuam no historico.", "success")
+    return redirect(url_for("auth.locais_entrega"))
 
 
 @auth_bp.route("/configuracoes", methods=["GET", "POST"])

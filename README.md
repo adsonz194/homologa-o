@@ -18,6 +18,10 @@ Mercado Pago. Os segredos salvos por essa tela sao cifrados e nunca voltam a
 ser exibidos no navegador. A taxa inicial e R$ 6,00 por pedido e aparece no
 carrinho antes do cliente finalizar.
 
+Em **Locais**, o dono cadastra cada regiao atendida e o horario de inicio e
+fim daquele local. Um local pausado deixa de aparecer no checkout, sem alterar
+os pedidos ja registrados.
+
 ## Recuperacao de senha do dono
 
 Em **Configuracoes > Seguranca do painel**, o dono cadastra seu e-mail de

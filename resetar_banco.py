@@ -23,6 +23,9 @@ TABELAS_COM_DADOS = (
     "produtos",
     "usuarios",
     "tentativas_login",
+    "recuperacoes_senha",
+    "solicitacoes_recuperacao_senha",
+    "locais_entrega",
     "estabelecimentos",
 )
 

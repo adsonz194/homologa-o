@@ -154,6 +154,17 @@ def init_db():
         criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE
     )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS locais_entrega (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        estabelecimento_id INTEGER NOT NULL,
+        nome TEXT NOT NULL,
+        horario_abertura TEXT NOT NULL DEFAULT '00:00',
+        horario_encerramento TEXT NOT NULL,
+        ativo INTEGER NOT NULL DEFAULT 1 CHECK(ativo IN (0, 1)),
+        criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(estabelecimento_id) REFERENCES estabelecimentos(id) ON DELETE CASCADE,
+        UNIQUE(estabelecimento_id, nome COLLATE NOCASE)
+    )""")
     estabelecimento_padrao = db.execute(
         "SELECT id FROM estabelecimentos WHERE slug = ? COLLATE NOCASE",
         (current_app.config["ESTABELECIMENTO_PADRAO_SLUG"],),
@@ -217,6 +228,22 @@ def init_db():
             "UPDATE estabelecimentos SET identificador_instalacao = ? WHERE id = ?",
             (gerar_identificador_instalacao(), instalacao["id"]),
         )
+    # Mantem os locais que ja existiam no delivery anterior. A partir desta
+    # migracao, eles passam a ser editaveis pelo dono no painel.
+    locais_existentes = db.execute(
+        "SELECT COUNT(*) AS total FROM locais_entrega WHERE estabelecimento_id = ?",
+        (estabelecimento_padrao_id,),
+    ).fetchone()["total"]
+    if locais_existentes == 0 and current_app.config["ESTABELECIMENTO_PADRAO_SLUG"] == "menino-dos-sonhos":
+        db.executemany(
+            """INSERT INTO locais_entrega (estabelecimento_id, nome, horario_abertura, horario_encerramento)
+               VALUES (?, ?, ?, ?)""",
+            (
+                (estabelecimento_padrao_id, "Imbassai", "00:00", "00:00"),
+                (estabelecimento_padrao_id, "Marbelo", "00:00", "00:00"),
+                (estabelecimento_padrao_id, "Marasu", "00:00", "20:00"),
+            ),
+        )
     colunas_vendas = {coluna["name"] for coluna in db.execute("PRAGMA table_info(vendas)")}
     if "produto_id" not in colunas_vendas:
         db.execute("ALTER TABLE vendas ADD COLUMN produto_id INTEGER")
@@ -269,6 +296,11 @@ def init_db():
         db.execute("ALTER TABLE usuarios ADD COLUMN permissoes TEXT NOT NULL DEFAULT ''")
     if "email_recuperacao" not in colunas_usuarios:
         db.execute("ALTER TABLE usuarios ADD COLUMN email_recuperacao TEXT NOT NULL DEFAULT ''")
+    colunas_locais_entrega = {
+        coluna["name"] for coluna in db.execute("PRAGMA table_info(locais_entrega)")
+    }
+    if "horario_abertura" not in colunas_locais_entrega:
+        db.execute("ALTER TABLE locais_entrega ADD COLUMN horario_abertura TEXT NOT NULL DEFAULT '00:00'")
     for tabela in ("vendas", "produtos", "pedidos", "usuarios"):
         db.execute(
             f"UPDATE {tabela} SET estabelecimento_id = ? WHERE estabelecimento_id IS NULL",
@@ -292,6 +324,7 @@ def init_db():
     db.execute("CREATE INDEX IF NOT EXISTS idx_recuperacoes_senha_usuario_data ON recuperacoes_senha(usuario_id, criado_em)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_solicitacoes_recuperacao_ip_data ON solicitacoes_recuperacao_senha(endereco_ip, criado_em)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_tentativas_entrega_pedido_ip_data ON tentativas_entrega(pedido_id, endereco_ip, criado_em)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_locais_entrega_estabelecimento ON locais_entrega(estabelecimento_id, ativo, nome)")
     db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_pedidos_codigo_acompanhamento ON pedidos(codigo_acompanhamento)")
     db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_estabelecimentos_instalacao ON estabelecimentos(identificador_instalacao)")
     db.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_email_recuperacao

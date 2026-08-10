@@ -24,13 +24,6 @@ DIAS_SEMANA = (
     (0, "Segunda-feira"), (1, "Terca-feira"), (2, "Quarta-feira"),
     (3, "Quinta-feira"), (4, "Sexta-feira"), (5, "Sabado"), (6, "Domingo"),
 )
-LOCAIS_ENTREGA = (
-    ("IMBASSAI", "Imbassai", "00:00"),
-    ("MARBELO", "Marbelo", "00:00"),
-    ("MARASU", "Marasu", "20:00"),
-)
-
-
 def data_hora_loja():
     return datetime.now(FUSO_HORARIO_LOJA)
 
@@ -64,27 +57,89 @@ def status_funcionamento_estabelecimento(estabelecimento, agora=None):
     return {"aberto": True, "fechado_manual": False, "horario": horario, "mensagem": f"Aberto agora. Atendimento até {encerramento.strftime('%H:%M')}."}
 
 
-def local_entrega_por_codigo(codigo):
-    return next((local for local in LOCAIS_ENTREGA if local[0] == codigo), None)
+def listar_locais_entrega(estabelecimento_id, somente_ativos=False):
+    consulta = """SELECT id, nome, horario_abertura, horario_encerramento, ativo, criado_em
+                  FROM locais_entrega WHERE estabelecimento_id = ?"""
+    parametros = [estabelecimento_id]
+    if somente_ativos:
+        consulta += " AND ativo = 1"
+    consulta += " ORDER BY nome COLLATE NOCASE"
+    return get_db().execute(consulta, parametros).fetchall()
 
 
-def status_entrega_local(estabelecimento, codigo_local, agora=None):
-    """Combina a agenda geral com o limite específico de cada local."""
+def obter_local_entrega(local_id, estabelecimento_id, somente_ativos=False):
+    consulta = """SELECT id, nome, horario_abertura, horario_encerramento, ativo, criado_em
+                  FROM locais_entrega WHERE id = ? AND estabelecimento_id = ?"""
+    parametros = [local_id, estabelecimento_id]
+    if somente_ativos:
+        consulta += " AND ativo = 1"
+    return get_db().execute(consulta, parametros).fetchone()
+
+
+def criar_local_entrega(estabelecimento_id, nome, horario_abertura, horario_encerramento):
+    db = get_db()
+    cursor = db.execute(
+        """INSERT INTO locais_entrega (estabelecimento_id, nome, horario_abertura, horario_encerramento)
+           VALUES (?, ?, ?, ?)""",
+        (estabelecimento_id, nome, horario_abertura, horario_encerramento),
+    )
+    db.commit()
+    return cursor.lastrowid
+
+
+def atualizar_local_entrega(local_id, estabelecimento_id, nome, horario_abertura, horario_encerramento):
+    db = get_db()
+    cursor = db.execute(
+        """UPDATE locais_entrega SET nome = ?, horario_abertura = ?, horario_encerramento = ?
+           WHERE id = ? AND estabelecimento_id = ?""",
+        (nome, horario_abertura, horario_encerramento, local_id, estabelecimento_id),
+    )
+    db.commit()
+    return cursor.rowcount == 1
+
+
+def definir_local_entrega_ativo(local_id, estabelecimento_id, ativo):
+    db = get_db()
+    cursor = db.execute(
+        "UPDATE locais_entrega SET ativo = ? WHERE id = ? AND estabelecimento_id = ?",
+        (1 if ativo else 0, local_id, estabelecimento_id),
+    )
+    db.commit()
+    return cursor.rowcount == 1
+
+
+def excluir_local_entrega(local_id, estabelecimento_id):
+    db = get_db()
+    cursor = db.execute(
+        "DELETE FROM locais_entrega WHERE id = ? AND estabelecimento_id = ?",
+        (local_id, estabelecimento_id),
+    )
+    db.commit()
+    return cursor.rowcount == 1
+
+
+def status_entrega_local(estabelecimento, local, agora=None):
+    """Combina a agenda geral com o limite configurado para cada local."""
     status_loja = status_funcionamento_estabelecimento(estabelecimento, agora)
     if not status_loja["aberto"]:
         return status_loja
-    local = local_entrega_por_codigo(codigo_local)
     if local is None:
         return {"aberto": False, "mensagem": "Este local não é atendido pelo delivery."}
     agora = agora or data_hora_loja()
-    limite = time.fromisoformat(local[2])
+    abertura = time.fromisoformat(local["horario_abertura"])
+    limite = time.fromisoformat(local["horario_encerramento"])
     hora_atual = agora.timetz().replace(tzinfo=None)
+    if abertura != time(0) and hora_atual < abertura:
+        return {
+            "aberto": False,
+            "mensagem": f"As entregas para {local['nome']} comecam às {local['horario_abertura']}.",
+        }
     if limite != time(0) and hora_atual >= limite:
         return {
             "aberto": False,
-            "mensagem": f"Não fazemos mais entregas em {local[1]} hoje. Atendimento até {local[2]}.",
+            "mensagem": f"Não fazemos mais entregas em {local['nome']} hoje. Atendimento até {local['horario_encerramento']}.",
         }
-    return {"aberto": True, "mensagem": f"Entrega em {local[1]} disponível até {local[2]}."}
+    return {"aberto": True, "mensagem": f"Entrega em {local['nome']} disponível até {local['horario_encerramento']}."}
 
 
 def obter_estabelecimento(estabelecimento_id):

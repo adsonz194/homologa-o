@@ -5,12 +5,12 @@ from flask import Blueprint, current_app, flash, jsonify, redirect, render_templ
 
 from models import (
     EstoqueInsuficiente,
-    LOCAIS_ENTREGA,
     complementos_selecionados,
     confirmar_entrega_por_codigo,
     criar_pedido,
     detalhes_carrinho,
     itens_pedido,
+    listar_locais_entrega,
     listar_complementos_por_produto,
     listar_produtos_disponiveis,
     obter_estabelecimento,
@@ -23,7 +23,7 @@ from models import (
     quantidade_tentativas_entrega,
     registrar_tentativa_entrega,
     limpar_tentativas_entrega,
-    local_entrega_por_codigo,
+    obter_local_entrega,
     status_entrega_local,
     status_funcionamento_estabelecimento,
 )
@@ -244,13 +244,17 @@ def finalizar():
         return redirect(url_for("cliente.loja"))
     subtotal = sum(item["subtotal"] for item in itens)
     total = subtotal + estabelecimento["valor_entrega"]
+    locais_entrega = listar_locais_entrega(estabelecimento["id"], somente_ativos=True)
     if request.method == "GET":
-        return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=LOCAIS_ENTREGA)
+        return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=locais_entrega)
     cliente = request.form.get("cliente", "").strip()
     telefone = request.form.get("telefone", "").strip()
     endereco = request.form.get("endereco", "").strip()
-    codigo_local = request.form.get("local_entrega", "")
-    local = local_entrega_por_codigo(codigo_local)
+    try:
+        local_id = int(request.form.get("local_entrega", ""))
+    except (TypeError, ValueError):
+        local_id = None
+    local = obter_local_entrega(local_id, estabelecimento["id"], somente_ativos=True) if local_id else None
     modalidade_entrega = request.form.get("modalidade_entrega", "ENTREGA")
     forma_pagamento = request.form.get("forma_pagamento", "")
     valor_recebido = None
@@ -262,16 +266,16 @@ def finalizar():
         or forma_pagamento not in FORMAS_PAGAMENTO
     ):
         flash("Confira nome, telefone, forma de pagamento e modalidade de recebimento.", "danger")
-        return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=LOCAIS_ENTREGA), 400
+        return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=locais_entrega), 400
     if modalidade_entrega == "ENTREGA":
         if not 8 <= len(endereco) <= 300 or local is None:
             flash("Informe o local e o endereco completo para entrega.", "danger")
-            return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=LOCAIS_ENTREGA), 400
-        funcionamento_local = status_entrega_local(estabelecimento, codigo_local)
+            return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=locais_entrega), 400
+        funcionamento_local = status_entrega_local(estabelecimento, local)
         if not funcionamento_local["aberto"]:
             flash(funcionamento_local["mensagem"], "warning")
-            return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=LOCAIS_ENTREGA), 400
-        local_entrega = local[1]
+            return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=locais_entrega), 400
+        local_entrega = local["nome"]
     else:
         endereco = "Retirada na loja"
         local_entrega = "Retirada na loja"
@@ -283,7 +287,7 @@ def finalizar():
             valor_recebido = -1
         if modalidade_entrega != "ENTREGA" or valor_recebido < total_cobravel:
             flash("Para pagamento em dinheiro, informe um valor igual ou maior que o total da entrega.", "danger")
-            return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=LOCAIS_ENTREGA), 400
+            return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=locais_entrega), 400
     try:
         pedido_id = criar_pedido(
             cliente, telefone, endereco, local_entrega, modalidade_entrega, "", forma_pagamento,
