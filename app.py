@@ -1,7 +1,7 @@
 import hmac
 import secrets
 
-from flask import Flask, abort, g, render_template, request, session
+from flask import Flask, abort, flash, g, redirect, render_template, request, session, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 from config import Config
 from database import init_app as init_database
@@ -38,6 +38,8 @@ def create_app():
                 app.logger.error("Ambiente de producao sem Access Token do Mercado Pago configurado.")
             if not obter_segredo_webhook_mercadopago():
                 app.logger.warning("Ambiente de producao sem assinatura secreta do webhook Mercado Pago.")
+            if app.config["LICENSE_ENFORCEMENT"] and not app.config["LICENSE_SIGNING_KEY"]:
+                app.logger.error("Licenca obrigatoria ativada, mas LICENSE_SIGNING_KEY nao foi configurada.")
     app.register_blueprint(auth_bp)
     app.register_blueprint(cliente_bp)
     app.register_blueprint(vendas_bp)
@@ -56,6 +58,41 @@ def create_app():
         recebido = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
         if not esperado or not recebido or not hmac.compare_digest(esperado, recebido):
             abort(400, "Formulario expirado ou invalido. Atualize a pagina e tente novamente.")
+
+    @app.before_request
+    def validar_licenca_do_sistema():
+        """Bloqueia novas operacoes quando a licenca obrigatoria venceu.
+
+        O dono continua conseguindo entrar em /licenca para colar o novo
+        certificado. Retornos e acompanhamento de pedidos ja existentes ficam
+        acessiveis para que nenhum pagamento ou entrega em andamento se perca.
+        """
+        endpoint = request.endpoint or ""
+        rotas_liberadas = {
+            "static", "healthz", "auth.entrar", "auth.sair", "auth.licenca",
+            "webhook.receber_webhook", "cliente.retorno_checkout_pedido",
+            "cliente.retorno_checkout_codigo", "cliente.pedido", "cliente.status_pedido",
+            "cliente.nota_pdf", "cliente.confirmar_entrega", "cliente.acompanhar_pedido",
+        }
+        if endpoint in rotas_liberadas:
+            return
+        from models import obter_estabelecimento_por_slug, status_certificado_estabelecimento
+        estabelecimento = obter_estabelecimento_por_slug(app.config["ESTABELECIMENTO_PADRAO_SLUG"])
+        if estabelecimento is None:
+            return
+        g.licenca = status_certificado_estabelecimento(estabelecimento)
+        if not app.config["LICENSE_ENFORCEMENT"] or g.licenca["valido"]:
+            return
+        if endpoint.startswith("cliente."):
+            return render_template("licenca_indisponivel.html", licenca=g.licenca), 503
+        usuario = getattr(g, "usuario", None)
+        if usuario is not None and usuario["papel"] == "DONO":
+            flash("A licenca precisa ser renovada antes de usar o sistema.", "warning")
+            return redirect(url_for("auth.licenca"))
+        return render_template(
+            "erro.html", codigo=403,
+            mensagem="A licenca desta instalacao venceu. Procure o dono do restaurante para renovar.",
+        ), 403
 
     @app.after_request
     def cabecalhos_de_seguranca(resposta):
@@ -77,11 +114,13 @@ def create_app():
         if "csrf_token" not in session:
             session["csrf_token"] = secrets.token_urlsafe(32)
         usuario = getattr(g, "usuario", None)
+        licenca = getattr(g, "licenca", None)
         return {
             "usuario": usuario,
             "permissoes_usuario": permissoes_usuario(usuario),
             "rota_inicial_painel": rota_inicial_painel(usuario),
             "csrf_token": session["csrf_token"],
+            "licenca": licenca,
         }
 
     @app.get("/healthz")

@@ -10,6 +10,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from flask import current_app
 
 from database import gerar_codigo_acompanhamento, get_db
+from licencas import validar_certificado
 
 
 class EstoqueInsuficiente(ValueError):
@@ -131,6 +132,76 @@ def _descriptografar_configuracao(valor):
     except (InvalidToken, ValueError, TypeError):
         current_app.logger.warning("Uma credencial salva no painel nao pode ser lida com a chave atual.")
         return ""
+
+
+def status_certificado_estabelecimento(estabelecimento):
+    """Retorna o estado da licenca, sempre conferindo a assinatura do certificado."""
+    chave = current_app.config["LICENSE_SIGNING_KEY"]
+    certificado = _descriptografar_configuracao(estabelecimento["certificado_licenca_criptografado"])
+    if not chave and not current_app.config["LICENSE_ENFORCEMENT"]:
+        return {
+            "valido": True,
+            "status": "NAO_OBRIGATORIO",
+            "mensagem": "A validacao obrigatoria de certificado esta desativada.",
+            "obrigatorio": False,
+        }
+    if not chave:
+        return {
+            "valido": False,
+            "status": "CONFIGURACAO_INCOMPLETA",
+            "mensagem": "A chave de validacao do certificado ainda nao foi configurada.",
+            "obrigatorio": True,
+        }
+    if not certificado:
+        if not current_app.config["LICENSE_ENFORCEMENT"]:
+            return {
+                "valido": True,
+                "status": "SEM_CERTIFICADO",
+                "mensagem": "Nenhum certificado foi validado; a obrigatoriedade esta desativada.",
+                "obrigatorio": False,
+            }
+        return {
+            "valido": False,
+            "status": "SEM_CERTIFICADO",
+            "mensagem": "Nenhum certificado de licenca foi validado nesta instalacao.",
+            "obrigatorio": True,
+        }
+    resultado = validar_certificado(
+        certificado,
+        estabelecimento["identificador_instalacao"],
+        chave,
+    )
+    resultado["obrigatorio"] = current_app.config["LICENSE_ENFORCEMENT"]
+    if not current_app.config["LICENSE_ENFORCEMENT"] and not resultado["valido"]:
+        resultado["mensagem"] += " A obrigatoriedade esta desativada."
+    return resultado
+
+
+def validar_e_salvar_certificado(estabelecimento_id, certificado):
+    """Aceita somente um certificado assinado e valido para esta instalacao."""
+    estabelecimento = obter_estabelecimento(estabelecimento_id)
+    if estabelecimento is None:
+        return {"valido": False, "status": "NAO_ENCONTRADO", "mensagem": "Estabelecimento nao encontrado."}
+    chave = current_app.config["LICENSE_SIGNING_KEY"]
+    if not chave:
+        return {
+            "valido": False,
+            "status": "CONFIGURACAO_INCOMPLETA",
+            "mensagem": "A chave de validacao ainda nao foi configurada pelo fornecedor.",
+        }
+    resultado = validar_certificado(certificado, estabelecimento["identificador_instalacao"], chave)
+    if not resultado["valido"]:
+        return resultado
+    db = get_db()
+    db.execute(
+        """UPDATE estabelecimentos
+           SET certificado_licenca_criptografado = ?, certificado_ativado_em = CURRENT_TIMESTAMP,
+               certificado_expira_em = ?
+           WHERE id = ?""",
+        (_criptografar_configuracao(str(certificado).strip()), resultado["expira_em"].isoformat(), estabelecimento_id),
+    )
+    db.commit()
+    return resultado
 
 
 def obter_token_mercadopago(estabelecimento_id=None):

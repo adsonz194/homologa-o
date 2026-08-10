@@ -17,6 +17,10 @@ class Config:
     SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
     MERCADOPAGO_WEBHOOK_SECRET = os.getenv("MERCADOPAGO_WEBHOOK_SECRET", "")
     CONFIG_ENCRYPTION_KEY = os.getenv("CONFIG_ENCRYPTION_KEY", "")
+    # Nunca coloque esta chave no Git nem a envie ao restaurante. Ela serve
+    # apenas para assinar certificados de licenca emitidos pelo fornecedor.
+    LICENSE_SIGNING_KEY = os.getenv("LICENSE_SIGNING_KEY", "")
+    LICENSE_ENFORCEMENT = os.getenv("LICENSE_ENFORCEMENT", "false").lower() == "true"
     ESTABELECIMENTO_PADRAO_SLUG = os.getenv("ESTABELECIMENTO_PADRAO_SLUG", "menino-dos-sonhos")
     ESTABELECIMENTO_PADRAO_NOME = os.getenv("ESTABELECIMENTO_PADRAO_NOME", "Menino dos Sonhos")
     WHATSAPP_EMPRESA = "".join(caractere for caractere in os.getenv("WHATSAPP_EMPRESA", "5571992843791") if caractere.isdigit())

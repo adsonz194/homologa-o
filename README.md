@@ -18,6 +18,36 @@ Mercado Pago. Os segredos salvos por essa tela sao cifrados e nunca voltam a
 ser exibidos no navegador. A taxa inicial e R$ 6,00 por pedido e aparece no
 carrinho antes do cliente finalizar.
 
+## Licenca mensal por certificado
+
+O painel do dono possui a aba **Licenca**. Ela mostra um codigo unico da
+instalacao. Depois do pagamento da mensalidade, o fornecedor gera um
+certificado para esse codigo e envia o texto ao dono pelo canal combinado.
+O dono cola o certificado na mesma tela e clica em **Validar certificado**.
+
+O certificado e assinado, tem data de vencimento e nao pode ser reaproveitado
+em outra instalacao. Para ativar este controle em uma instalacao nova:
+
+1. Gere uma chave longa e secreta (minimo de 48 caracteres) e salve-a em
+   `LICENSE_SIGNING_KEY` tanto no ambiente seguro do servidor como no seu
+   computador de manutencao. Nunca envie essa chave ao restaurante nem a
+   versione no Git.
+2. Entre no painel como dono, abra **Licenca** e copie o codigo da instalacao.
+3. No aplicativo local privado **GeradorCertificadosDelivery**, informe o
+   codigo da instalacao e a validade. Esse aplicativo nao faz parte deste
+   repositorio e nao deve ser enviado ao GitHub.
+4. Envie ao dono apenas o texto que comeca com `MDS-LIC1`. Ele deve colar esse
+   texto na aba **Licenca** e validar.
+5. Depois de testar a ativacao, defina `LICENSE_ENFORCEMENT=true` no servidor.
+   Sem certificado valido, novas vendas ficam bloqueadas. O dono ainda pode
+   entrar na aba **Licenca** para renovar, e pedidos antigos podem continuar
+   sendo acompanhados e entregues.
+
+Este mecanismo impede a alteracao manual da data dentro do painel. Como todo
+software hospedado pelo proprio cliente, ele nao protege contra quem tenha
+acesso administrativo completo ao servidor, banco de dados e chaves de
+ambiente. Para maior controle, mantenha a hospedagem sob a sua administracao.
+
 ## Executar localmente
 
 ```powershell

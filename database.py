@@ -2,6 +2,8 @@ import sqlite3
 import secrets
 from flask import current_app, g
 
+from licencas import gerar_identificador_instalacao
+
 
 def gerar_codigo_acompanhamento(db):
     for _ in range(20):
@@ -47,6 +49,10 @@ def init_db():
         fechado_hoje_data TEXT,
         mercadopago_token_criptografado TEXT,
         webhook_secret_criptografado TEXT,
+        identificador_instalacao TEXT,
+        certificado_licenca_criptografado TEXT,
+        certificado_ativado_em TEXT,
+        certificado_expira_em TEXT,
         status_plano TEXT NOT NULL DEFAULT 'ATIVO' CHECK(status_plano IN ('PENDENTE', 'ATIVO', 'EXPIRADO', 'CANCELADO')),
         plano_expira_em TEXT,
         criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -179,6 +185,22 @@ def init_db():
         db.execute("ALTER TABLE estabelecimentos ADD COLUMN cnpj TEXT NOT NULL DEFAULT ''")
     if "endereco" not in colunas_estabelecimentos:
         db.execute("ALTER TABLE estabelecimentos ADD COLUMN endereco TEXT NOT NULL DEFAULT ''")
+    if "identificador_instalacao" not in colunas_estabelecimentos:
+        db.execute("ALTER TABLE estabelecimentos ADD COLUMN identificador_instalacao TEXT")
+    if "certificado_licenca_criptografado" not in colunas_estabelecimentos:
+        db.execute("ALTER TABLE estabelecimentos ADD COLUMN certificado_licenca_criptografado TEXT")
+    if "certificado_ativado_em" not in colunas_estabelecimentos:
+        db.execute("ALTER TABLE estabelecimentos ADD COLUMN certificado_ativado_em TEXT")
+    if "certificado_expira_em" not in colunas_estabelecimentos:
+        db.execute("ALTER TABLE estabelecimentos ADD COLUMN certificado_expira_em TEXT")
+    instalacoes_sem_codigo = db.execute(
+        "SELECT id FROM estabelecimentos WHERE identificador_instalacao IS NULL OR identificador_instalacao = ''"
+    ).fetchall()
+    for instalacao in instalacoes_sem_codigo:
+        db.execute(
+            "UPDATE estabelecimentos SET identificador_instalacao = ? WHERE id = ?",
+            (gerar_identificador_instalacao(), instalacao["id"]),
+        )
     colunas_vendas = {coluna["name"] for coluna in db.execute("PRAGMA table_info(vendas)")}
     if "produto_id" not in colunas_vendas:
         db.execute("ALTER TABLE vendas ADD COLUMN produto_id INTEGER")
@@ -251,6 +273,7 @@ def init_db():
     db.execute("CREATE INDEX IF NOT EXISTS idx_tentativas_login_ip_data ON tentativas_login(endereco_ip, criado_em)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_tentativas_entrega_pedido_ip_data ON tentativas_entrega(pedido_id, endereco_ip, criado_em)")
     db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_pedidos_codigo_acompanhamento ON pedidos(codigo_acompanhamento)")
+    db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_estabelecimentos_instalacao ON estabelecimentos(identificador_instalacao)")
     db.commit()
 
 def init_app(app):

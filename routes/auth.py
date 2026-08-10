@@ -22,7 +22,9 @@ from models import (
     obter_usuario_por_nome,
     quantidade_tentativas_login,
     registrar_tentativa_login,
+    status_certificado_estabelecimento,
     status_funcionamento_estabelecimento,
+    validar_e_salvar_certificado,
 )
 
 auth_bp = Blueprint("auth", __name__)
@@ -186,6 +188,32 @@ def sair():
     session.clear()
     flash("Sessao encerrada.", "success")
     return redirect(url_for("cliente.loja"))
+
+
+@auth_bp.route("/licenca", methods=["GET", "POST"])
+@owner_required
+def licenca():
+    estabelecimento = obter_estabelecimento(g.usuario["estabelecimento_id"])
+    if estabelecimento is None:
+        return "Estabelecimento nao encontrado", 404
+    if request.method == "POST":
+        certificado = request.form.get("certificado", "").strip()
+        if not 40 <= len(certificado) <= 4_000:
+            flash("Cole o certificado completo recebido do fornecedor.", "danger")
+        else:
+            resultado = validar_e_salvar_certificado(estabelecimento["id"], certificado)
+            if resultado["valido"]:
+                flash(resultado["mensagem"], "success")
+                return redirect(url_for("auth.licenca"))
+            flash(resultado["mensagem"], "danger")
+    estabelecimento = obter_estabelecimento(estabelecimento["id"])
+    return render_template(
+        "licenca.html",
+        estabelecimento=estabelecimento,
+        licenca=status_certificado_estabelecimento(estabelecimento),
+        validacao_obrigatoria=current_app.config["LICENSE_ENFORCEMENT"],
+        chave_configurada=bool(current_app.config["LICENSE_SIGNING_KEY"]),
+    )
 
 
 @auth_bp.get("/usuarios")

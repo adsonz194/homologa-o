@@ -22,6 +22,7 @@
             <a class="btn btn-outline-light btn-sm" href="{{ url_for('produtos.index') }}">Produtos</a>
             <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.usuarios') }}">Funcionarios</a>
             <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.configuracoes') }}">Configuracoes</a>
+            <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.licenca') }}">Licenca</a>
           {% else %}
             {% if 'VENDAS' in permissoes_usuario %}<a class="btn btn-outline-light btn-sm" href="{{ url_for('vendas.index') }}">Vendas</a>{% endif %}
             {% if 'RELATORIOS' in permissoes_usuario %}<a class="btn btn-outline-light btn-sm" href="{{ url_for('vendas.relatorio') }}">Relatorio</a>{% endif %}

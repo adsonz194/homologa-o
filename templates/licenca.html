@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}Licenca | Painel{% endblock %}
+{% block content %}
+<div class="page-heading"><h1>Licenca do sistema</h1><p>Renove o acesso mensalmente com o certificado recebido do fornecedor.</p></div>
+<div class="row justify-content-center"><div class="col-xl-8">
+  <section class="card shadow-sm mb-4"><div class="card-body p-md-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3"><div><h2 class="h5 mb-1">Situacao atual</h2><p class="mb-0 text-{% if licenca.status in ['ATIVO', 'NAO_OBRIGATORIO'] %}success{% elif licenca.status == 'EXPIRADO' %}danger{% else %}warning{% endif %}"><strong>{{ licenca.status|replace('_', ' ')|title }}.</strong> {{ licenca.mensagem }}</p></div>{% if licenca.expira_em %}<span class="badge text-bg-success fs-6">Valida ate {{ licenca.expira_em.strftime('%d/%m/%Y') }}</span>{% endif %}</div>
+    {% if not validacao_obrigatoria %}<div class="alert alert-warning small mt-3 mb-0">A validacao obrigatoria ainda esta desligada. O certificado pode ser testado, mas o bloqueio por vencimento so sera ativado quando o fornecedor configurar <code>LICENSE_ENFORCEMENT=true</code>.</div>{% elif not chave_configurada %}<div class="alert alert-danger small mt-3 mb-0">A chave de validacao ainda nao foi configurada pelo fornecedor. Entre em contato para concluir a ativacao.</div>{% endif %}
+  </div></section>
+  <section class="card shadow-sm"><div class="card-body p-md-4">
+    <h2 class="h5">Renovar ou validar certificado</h2><p class="text-muted small">Envie o codigo abaixo ao fornecedor. Depois de confirmar o pagamento, ele enviara um novo certificado. Cole-o aqui e clique em validar.</p>
+    <label class="form-label" for="instalacao">Codigo da instalacao</label><div class="input-group mb-4"><input class="form-control font-monospace" id="instalacao" value="{{ estabelecimento.identificador_instalacao }}" readonly><span class="input-group-text">Envie este codigo</span></div>
+    <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label class="form-label" for="certificado">Certificado mensal</label><textarea class="form-control font-monospace" id="certificado" name="certificado" rows="5" maxlength="4000" placeholder="MDS-LIC1..." required></textarea><div class="form-text">O certificado e vinculado a este codigo de instalacao e nao pode ser alterado manualmente.</div><div class="mt-4 d-flex justify-content-end"><button class="btn btn-primary px-4">Validar certificado</button></div></form>
+  </div></section>
+</div></div>
+{% endblock %}
