@@ -121,6 +121,7 @@ def create_app():
             "rota_inicial_painel": rota_inicial_painel(usuario),
             "csrf_token": session["csrf_token"],
             "licenca": licenca,
+            "suporte_whatsapp": app.config["SUPPORT_WHATSAPP"],
         }
 
     @app.get("/healthz")

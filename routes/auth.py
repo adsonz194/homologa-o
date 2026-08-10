@@ -1,26 +1,38 @@
 from datetime import datetime
 from functools import wraps
 import re
+import secrets
 import sqlite3
 from urllib.parse import urlparse
 
 from flask import Blueprint, current_app, flash, g, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from email_service import EmailEnvioErro, email_recuperacao_configurado, enviar_codigo_recuperacao
+
 from models import (
     atualizar_configuracao_estabelecimento,
+    atualizar_email_recuperacao,
     atualizar_funcionario,
+    criar_recuperacao_senha,
     criar_usuario,
     definir_usuario_ativo,
     definir_fechado_hoje,
     limpar_tentativas_login,
+    email_recuperacao_em_uso,
+    email_recuperacao_valido,
+    invalidar_recuperacoes_senha,
     listar_funcionarios,
     obter_estabelecimento,
     obter_funcionario,
     obter_segredo_webhook_mercadopago,
     obter_token_mercadopago,
     obter_usuario_por_nome,
+    obter_usuario_por_recuperacao,
+    quantidade_solicitacoes_recuperacao,
     quantidade_tentativas_login,
+    redefinir_senha_com_codigo,
+    registrar_solicitacao_recuperacao,
     registrar_tentativa_login,
     status_certificado_estabelecimento,
     status_funcionamento_estabelecimento,
@@ -111,7 +123,7 @@ def carregar_usuario():
     if usuario_id:
         from database import get_db
         g.usuario = get_db().execute(
-            "SELECT id, nome, usuario, papel, permissoes, estabelecimento_id FROM usuarios WHERE id = ? AND ativo = 1", (usuario_id,)
+            "SELECT id, nome, usuario, email_recuperacao, papel, permissoes, estabelecimento_id FROM usuarios WHERE id = ? AND ativo = 1", (usuario_id,)
         ).fetchone()
         if g.usuario is None:
             session.clear()
@@ -181,6 +193,69 @@ def entrar():
         registrar_tentativa_login(endereco_ip)
         flash("Usuario ou senha invalidos.", "danger")
     return render_template("entrar.html", proximo=request.args.get("proximo", ""))
+
+
+@auth_bp.route("/recuperar-senha", methods=["GET", "POST"])
+def recuperar_senha():
+    """Solicita um codigo por e-mail sem confirmar se a conta existe."""
+    if g.usuario is not None:
+        return redirect(rota_inicial_painel())
+    if request.method == "POST":
+        endereco_ip = request.remote_addr or "desconhecido"
+        if quantidade_solicitacoes_recuperacao(
+            endereco_ip, current_app.config["PASSWORD_RESET_JANELA_SEGUNDOS"]
+        ) >= current_app.config["PASSWORD_RESET_MAX_SOLICITACOES"]:
+            flash("Muitas solicitacoes. Aguarde alguns minutos antes de pedir outro codigo.", "danger")
+            return render_template("recuperar_senha.html"), 429
+        identificador = request.form.get("identificador", "").strip()
+        if not identificador:
+            flash("Informe seu usuario ou e-mail de recuperacao.", "danger")
+            return render_template("recuperar_senha.html"), 400
+        registrar_solicitacao_recuperacao(endereco_ip)
+        conta = obter_usuario_por_recuperacao(identificador)
+        if conta is not None and conta["email_recuperacao"]:
+            codigo = f"{secrets.randbelow(1_000_000):06d}"
+            criar_recuperacao_senha(
+                conta["id"], generate_password_hash(codigo), current_app.config["PASSWORD_RESET_TTL_MINUTES"]
+            )
+            try:
+                enviar_codigo_recuperacao(conta["email_recuperacao"], codigo, conta["nome"])
+            except EmailEnvioErro:
+                invalidar_recuperacoes_senha(conta["id"])
+                flash("Nao foi possivel enviar o codigo agora. Entre em contato com o suporte da AG Delivery.", "danger")
+                return render_template("recuperar_senha.html"), 503
+        # A mensagem generica evita que terceiros confirmem quais contas existem.
+        flash("Se os dados informados tiverem um e-mail de recuperacao cadastrado, o codigo foi enviado.", "success")
+        return redirect(url_for("auth.redefinir_senha", identificador=identificador))
+    return render_template("recuperar_senha.html")
+
+
+@auth_bp.route("/redefinir-senha", methods=["GET", "POST"])
+def redefinir_senha():
+    if g.usuario is not None:
+        return redirect(rota_inicial_painel())
+    identificador = request.values.get("identificador", "").strip()
+    if request.method == "POST":
+        codigo = "".join(caractere for caractere in request.form.get("codigo", "") if caractere.isdigit())
+        senha = request.form.get("senha", "")
+        confirmacao = request.form.get("confirmacao_senha", "")
+        if not identificador or len(codigo) != 6 or len(senha) < 12 or senha != confirmacao:
+            flash("Informe o codigo de 6 digitos e uma nova senha de pelo menos 12 caracteres.", "danger")
+            return render_template("redefinir_senha.html", identificador=identificador), 400
+        resultado = redefinir_senha_com_codigo(
+            identificador, codigo, generate_password_hash(senha), current_app.config["PASSWORD_RESET_MAX_TENTATIVAS"]
+        )
+        if resultado == "SUCESSO":
+            flash("Senha alterada com sucesso. Entre com a nova senha.", "success")
+            return redirect(url_for("auth.entrar"))
+        mensagens = {
+            "CODIGO_EXPIRADO": "O codigo expirou. Solicite um novo.",
+            "CODIGO_BLOQUEADO": "Este codigo foi bloqueado. Solicite um novo.",
+            "CODIGO_INVALIDO": "Codigo invalido. Confira o e-mail e tente novamente.",
+        }
+        flash(mensagens.get(resultado, "Nao foi possivel alterar a senha."), "danger")
+        return render_template("redefinir_senha.html", identificador=identificador), 400
+    return render_template("redefinir_senha.html", identificador=identificador)
 
 
 @auth_bp.post("/sair")
@@ -299,6 +374,7 @@ def configuracoes():
             horario_encerramento = _horario_valido(request.form.get("horario_encerramento", ""))
             access_token = request.form.get("mercadopago_access_token", "").strip()
             webhook_secret = request.form.get("mercadopago_webhook_secret", "").strip()
+            email_recuperacao = request.form.get("email_recuperacao", "").strip().lower()
             endereco = urlparse(url_publica)
             if (
                 not 2 <= len(nome) <= 120
@@ -315,16 +391,19 @@ def configuracoes():
                 or (horario_encerramento != "00:00" and horario_abertura > horario_encerramento)
                 or len(access_token) > 500
                 or len(webhook_secret) > 500
+                or (email_recuperacao and not email_recuperacao_valido(email_recuperacao))
+                or email_recuperacao_em_uso(g.usuario["id"], email_recuperacao)
             ):
                 raise ValueError
+            atualizar_email_recuperacao(g.usuario["id"], email_recuperacao)
             atualizar_configuracao_estabelecimento(
                 estabelecimento["id"], nome, razao_social, cnpj, endereco_loja, telefone, whatsapp, valor_entrega, url_publica,
                 ",".join(dias), horario_abertura, horario_encerramento, access_token, webhook_secret,
             )
-            flash("Configurações salvas. Horários, dias e frete já aparecem no delivery.", "success")
+            flash("Configuracoes salvas. Horarios, frete e e-mail de recuperacao foram atualizados.", "success")
             return redirect(url_for("auth.configuracoes"))
-        except (TypeError, ValueError):
-            flash("Confira nome, WhatsApp, URL HTTPS, dias e horários de funcionamento.", "danger")
+        except (TypeError, ValueError, sqlite3.IntegrityError):
+            flash("Confira nome, WhatsApp, e-mail de recuperacao, URL HTTPS, dias e horarios de funcionamento.", "danger")
     estabelecimento = obter_estabelecimento(estabelecimento["id"])
     return render_template(
         "configuracoes.html",
@@ -335,6 +414,9 @@ def configuracoes():
         dias_funcionamento=DIAS_FUNCIONAMENTO,
         dias_selecionados=set(str(estabelecimento["dias_funcionamento"] or "").split(",")),
         funcionamento=status_funcionamento_estabelecimento(estabelecimento),
+        email_recuperacao=g.usuario["email_recuperacao"] or "",
+        email_envio_configurado=email_recuperacao_configurado(),
+        suporte_whatsapp=current_app.config["SUPPORT_WHATSAPP"],
     )
 
 

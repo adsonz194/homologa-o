@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import hmac
+import re
 import secrets
 from datetime import datetime, time
 from urllib.parse import urlparse
@@ -8,6 +9,7 @@ from zoneinfo import ZoneInfo
 
 from cryptography.fernet import Fernet, InvalidToken
 from flask import current_app
+from werkzeug.security import check_password_hash
 
 from database import gerar_codigo_acompanhamento, get_db
 from licencas import validar_certificado
@@ -701,6 +703,127 @@ def obter_usuario_por_nome(usuario):
     return get_db().execute(
         "SELECT * FROM usuarios WHERE usuario = ? COLLATE NOCASE AND ativo = 1", (usuario,)
     ).fetchone()
+
+
+def email_recuperacao_valido(email):
+    """Valida o endereco usado apenas para recuperar a conta do dono."""
+    return bool(re.fullmatch(r"[^@\s]{1,64}@[^@\s]{1,190}\.[^@\s]{2,63}", str(email or "")))
+
+
+def atualizar_email_recuperacao(usuario_id, email):
+    """Troca o e-mail e invalida codigos antigos para evitar uso indevido."""
+    db = get_db()
+    with db:
+        db.execute(
+            "UPDATE usuarios SET email_recuperacao = ? WHERE id = ? AND papel = 'DONO'",
+            (email.strip().lower(), usuario_id),
+        )
+        db.execute(
+            "UPDATE recuperacoes_senha SET usado_em = CURRENT_TIMESTAMP WHERE usuario_id = ? AND usado_em IS NULL",
+            (usuario_id,),
+        )
+
+
+def email_recuperacao_em_uso(usuario_id, email):
+    if not email:
+        return False
+    return get_db().execute(
+        """SELECT 1 FROM usuarios
+           WHERE email_recuperacao = ? COLLATE NOCASE AND id <> ? LIMIT 1""",
+        (email, usuario_id),
+    ).fetchone() is not None
+
+
+def obter_usuario_por_recuperacao(identificador):
+    """Localiza uma conta ativa por usuario ou pelo e-mail de recuperacao."""
+    valor = str(identificador or "").strip()
+    return get_db().execute(
+        """SELECT * FROM usuarios
+           WHERE ativo = 1 AND (usuario = ? COLLATE NOCASE OR email_recuperacao = ? COLLATE NOCASE)
+           LIMIT 1""",
+        (valor, valor),
+    ).fetchone()
+
+
+def criar_recuperacao_senha(usuario_id, codigo_hash, minutos_validade):
+    """Mantem somente um codigo de recuperacao ativo por usuario."""
+    db = get_db()
+    minutos = max(1, int(minutos_validade))
+    with db:
+        db.execute(
+            "UPDATE recuperacoes_senha SET usado_em = CURRENT_TIMESTAMP WHERE usuario_id = ? AND usado_em IS NULL",
+            (usuario_id,),
+        )
+        db.execute(
+            """INSERT INTO recuperacoes_senha (usuario_id, codigo_hash, expira_em)
+               VALUES (?, ?, datetime('now', ?))""",
+            (usuario_id, codigo_hash, f"+{minutos} minutes"),
+        )
+
+
+def invalidar_recuperacoes_senha(usuario_id):
+    db = get_db()
+    with db:
+        db.execute(
+            "UPDATE recuperacoes_senha SET usado_em = CURRENT_TIMESTAMP WHERE usuario_id = ? AND usado_em IS NULL",
+            (usuario_id,),
+        )
+
+
+def redefinir_senha_com_codigo(identificador, codigo, nova_senha_hash, max_tentativas):
+    """Valida um codigo de uso unico e troca a senha sem revelar dados da conta."""
+    usuario = obter_usuario_por_recuperacao(identificador)
+    if usuario is None:
+        return "CODIGO_INVALIDO"
+    db = get_db()
+    limite = max(1, int(max_tentativas))
+    with db:
+        recuperacao = db.execute(
+            """SELECT * FROM recuperacoes_senha
+               WHERE usuario_id = ? AND usado_em IS NULL
+               ORDER BY id DESC LIMIT 1""",
+            (usuario["id"],),
+        ).fetchone()
+        agora = db.execute("SELECT datetime('now') AS agora").fetchone()["agora"]
+        if recuperacao is None or recuperacao["expira_em"] <= agora:
+            if recuperacao is not None:
+                db.execute("UPDATE recuperacoes_senha SET usado_em = CURRENT_TIMESTAMP WHERE id = ?", (recuperacao["id"],))
+            return "CODIGO_EXPIRADO"
+        if recuperacao["tentativas"] >= limite:
+            db.execute("UPDATE recuperacoes_senha SET usado_em = CURRENT_TIMESTAMP WHERE id = ?", (recuperacao["id"],))
+            return "CODIGO_BLOQUEADO"
+        if not check_password_hash(recuperacao["codigo_hash"], str(codigo or "")):
+            tentativas = recuperacao["tentativas"] + 1
+            usado_em = "CURRENT_TIMESTAMP" if tentativas >= limite else "NULL"
+            db.execute(
+                f"UPDATE recuperacoes_senha SET tentativas = ?, usado_em = {usado_em} WHERE id = ?",
+                (tentativas, recuperacao["id"]),
+            )
+            return "CODIGO_BLOQUEADO" if tentativas >= limite else "CODIGO_INVALIDO"
+        db.execute("UPDATE usuarios SET senha_hash = ? WHERE id = ?", (nova_senha_hash, usuario["id"]))
+        db.execute("UPDATE recuperacoes_senha SET usado_em = CURRENT_TIMESTAMP WHERE id = ?", (recuperacao["id"],))
+    return "SUCESSO"
+
+
+def quantidade_solicitacoes_recuperacao(endereco_ip, janela_segundos):
+    db = get_db()
+    segundos = max(1, int(janela_segundos))
+    with db:
+        db.execute("DELETE FROM solicitacoes_recuperacao_senha WHERE criado_em < datetime('now', '-1 day')")
+        return db.execute(
+            """SELECT COUNT(*) AS total FROM solicitacoes_recuperacao_senha
+               WHERE endereco_ip = ? AND criado_em >= datetime('now', ?)""",
+            (endereco_ip, f"-{segundos} seconds"),
+        ).fetchone()["total"]
+
+
+def registrar_solicitacao_recuperacao(endereco_ip):
+    db = get_db()
+    with db:
+        db.execute(
+            "INSERT INTO solicitacoes_recuperacao_senha (endereco_ip) VALUES (?)",
+            (endereco_ip,),
+        )
 
 
 def quantidade_tentativas_login(endereco_ip, janela_segundos):

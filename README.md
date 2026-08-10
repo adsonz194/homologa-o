@@ -18,6 +18,27 @@ Mercado Pago. Os segredos salvos por essa tela sao cifrados e nunca voltam a
 ser exibidos no navegador. A taxa inicial e R$ 6,00 por pedido e aparece no
 carrinho antes do cliente finalizar.
 
+## Recuperacao de senha do dono
+
+Em **Configuracoes > Seguranca do painel**, o dono cadastra seu e-mail de
+recuperacao. Na tela `/entrar`, o link **Esqueci minha senha** envia um codigo
+de seis digitos, valido por 15 minutos e utilizavel uma unica vez. O sistema
+limita solicitacoes e bloqueia o codigo apos tentativas incorretas repetidas.
+
+Para habilitar o envio, configure no ambiente seguro do servidor ou do Render
+as variaveis `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` e
+`SMTP_FROM`. Para a porta 587, mantenha `SMTP_USE_TLS=true`; para um provedor
+que usa SSL direto na porta 465, use `SMTP_USE_SSL=true` e `SMTP_USE_TLS=false`.
+Se utilizar Gmail, use uma senha de aplicativo, nunca a senha normal da conta.
+Esses valores nao devem ir para o GitHub.
+
+Sem acesso ao e-mail, a pessoa deve falar com a AG Delivery pelo suporte. A
+recuperacao manual deve conferir os dados cadastrais da loja e gerar uma nova
+senha; nao aceite senha, codigo temporario ou token enviado por WhatsApp.
+Somente apos essa conferencia, o fornecedor pode abrir o Shell do servidor e
+executar `py redefinir_senha_dono.py` (ou `python3 redefinir_senha_dono.py` no
+Linux). Esse utilitario e exclusivo do terminal e nao abre uma pagina publica.
+
 ## Licenca mensal por certificado
 
 O painel do dono possui a aba **Licenca**. Ela mostra um codigo unico da

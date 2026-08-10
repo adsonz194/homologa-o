@@ -84,6 +84,7 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT NOT NULL,
         usuario TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        email_recuperacao TEXT NOT NULL DEFAULT '',
         senha_hash TEXT NOT NULL,
         papel TEXT NOT NULL CHECK(papel IN ('DONO', 'FUNCIONARIO')),
         permissoes TEXT NOT NULL DEFAULT '',
@@ -91,6 +92,21 @@ def init_db():
         criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )""")
     db.execute("""CREATE TABLE IF NOT EXISTS tentativas_login (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        endereco_ip TEXT NOT NULL,
+        criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS recuperacoes_senha (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario_id INTEGER NOT NULL,
+        codigo_hash TEXT NOT NULL,
+        expira_em TEXT NOT NULL,
+        tentativas INTEGER NOT NULL DEFAULT 0,
+        usado_em TEXT,
+        criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS solicitacoes_recuperacao_senha (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         endereco_ip TEXT NOT NULL,
         criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -251,6 +267,8 @@ def init_db():
         db.execute("ALTER TABLE usuarios ADD COLUMN estabelecimento_id INTEGER")
     if "permissoes" not in colunas_usuarios:
         db.execute("ALTER TABLE usuarios ADD COLUMN permissoes TEXT NOT NULL DEFAULT ''")
+    if "email_recuperacao" not in colunas_usuarios:
+        db.execute("ALTER TABLE usuarios ADD COLUMN email_recuperacao TEXT NOT NULL DEFAULT ''")
     for tabela in ("vendas", "produtos", "pedidos", "usuarios"):
         db.execute(
             f"UPDATE {tabela} SET estabelecimento_id = ? WHERE estabelecimento_id IS NULL",
@@ -271,9 +289,14 @@ def init_db():
     db.execute("CREATE INDEX IF NOT EXISTS idx_pedidos_estabelecimento ON pedidos(estabelecimento_id, id)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_usuarios_estabelecimento ON usuarios(estabelecimento_id, usuario)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_tentativas_login_ip_data ON tentativas_login(endereco_ip, criado_em)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_recuperacoes_senha_usuario_data ON recuperacoes_senha(usuario_id, criado_em)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_solicitacoes_recuperacao_ip_data ON solicitacoes_recuperacao_senha(endereco_ip, criado_em)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_tentativas_entrega_pedido_ip_data ON tentativas_entrega(pedido_id, endereco_ip, criado_em)")
     db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_pedidos_codigo_acompanhamento ON pedidos(codigo_acompanhamento)")
     db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_estabelecimentos_instalacao ON estabelecimentos(identificador_instalacao)")
+    db.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_email_recuperacao
+                  ON usuarios(email_recuperacao COLLATE NOCASE)
+                  WHERE email_recuperacao <> ''""")
     db.commit()
 
 def init_app(app):

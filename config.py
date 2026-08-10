@@ -26,3 +26,15 @@ class Config:
     WHATSAPP_EMPRESA = "".join(caractere for caractere in os.getenv("WHATSAPP_EMPRESA", "5571992843791") if caractere.isdigit())
     LOGIN_MAX_TENTATIVAS = int(os.getenv("LOGIN_MAX_TENTATIVAS", "5"))
     LOGIN_JANELA_SEGUNDOS = int(os.getenv("LOGIN_JANELA_SEGUNDOS", "900"))
+    PASSWORD_RESET_TTL_MINUTES = int(os.getenv("PASSWORD_RESET_TTL_MINUTES", "15"))
+    PASSWORD_RESET_MAX_TENTATIVAS = int(os.getenv("PASSWORD_RESET_MAX_TENTATIVAS", "5"))
+    PASSWORD_RESET_MAX_SOLICITACOES = int(os.getenv("PASSWORD_RESET_MAX_SOLICITACOES", "3"))
+    PASSWORD_RESET_JANELA_SEGUNDOS = int(os.getenv("PASSWORD_RESET_JANELA_SEGUNDOS", "900"))
+    SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USERNAME = os.getenv("SMTP_USERNAME", "").strip()
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM = os.getenv("SMTP_FROM", "").strip()
+    SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+    SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "false").lower() == "true"
+    SUPPORT_WHATSAPP = "".join(caractere for caractere in os.getenv("SUPPORT_WHATSAPP", "5571992843791") if caractere.isdigit())
