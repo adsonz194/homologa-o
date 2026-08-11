@@ -332,7 +332,9 @@ def finalizar():
     pedido = obter_pedido(pedido_id)
     if forma_pagamento == "DINHEIRO":
         flash("Pedido registrado. O entregador levara o troco informado.", "success")
-        return redirect(url_for("cliente.pedido", codigo=pedido["codigo_acompanhamento"]))
+        # Dinheiro ainda sera recebido pelo entregador, mas o pedido ja foi
+        # confirmado pela loja e deve chegar ao WhatsApp imediatamente.
+        return redirect(url_for("cliente.pedido", codigo=pedido["codigo_acompanhamento"], whatsapp="1"))
     session["pedido_pagamento_pendente"] = pedido_id
     # Mantemos o mesmo encadeamento HTTP simples que era usado no checkout
     # original: formulario -> rota do checkout -> Mercado Pago. Nao ha pagina
@@ -442,7 +444,7 @@ def pedido(codigo):
     pedido_atual = obter_pedido_por_codigo(codigo)
     if pedido_atual is None:
         return "Pedido nao encontrado", 404
-    return renderizar_pedido(pedido_atual)
+    return renderizar_pedido(pedido_atual, retorno_checkout=request.args.get("whatsapp") == "1")
 
 
 @cliente_bp.get("/cliente/acompanhamento/<codigo>/status")
