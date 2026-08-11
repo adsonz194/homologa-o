@@ -33,7 +33,7 @@
         <div id="confirmacao" class="alert alert-success mt-4 d-none">
           Pagamento aprovado. Voce sera direcionado ao WhatsApp da empresa.
         </div>
-        <a id="botao-whatsapp" class="btn btn-success mt-3 d-none" href="#">Falar com a empresa no WhatsApp</a>
+        <a id="botao-whatsapp" class="btn btn-success mt-3" href="#">Enviar mensagem para a empresa no WhatsApp</a>
         <a class="btn btn-outline-primary mt-3" href="{{ url_nota_pdf }}">Baixar comprovante em PDF</a>
         {% if pedido.status_pagamento == 'PENDENTE' and pedido.forma_pagamento != 'DINHEIRO' %}
           <form method="post" action="{{ url_reiniciar_pagamento }}" class="mt-3">
@@ -50,18 +50,13 @@
 <script>
   const pedidoId = {{ pedido.id }};
   const urlStatus = {{ url_status|tojson }};
-  const acompanhamentoUrl = {{ url_acompanhamento|tojson }};
-  const notaPdfUrl = new URL({{ url_nota_pdf|tojson }}, window.location.origin).href;
   const numeroWhatsapp = {{ whatsapp_empresa|tojson }};
-  const redirecionarAoWhatsapp = {{ 'true' if retorno_checkout else 'false' }};
   const pedidoEmDinheiro = {{ 'true' if pedido.forma_pagamento == 'DINHEIRO' else 'false' }};
   const mensagemWhatsapp = pedidoEmDinheiro
-    ? `Ola! Fiz o pedido #${pedidoId} e pagarei em dinheiro na entrega. Acompanhamento: ${acompanhamentoUrl}. Comprovante em PDF: ${notaPdfUrl}`
-    : `Ola! Realizei o pagamento do pedido #${pedidoId}. Acompanhamento: ${acompanhamentoUrl}. Comprovante em PDF: ${notaPdfUrl}`;
+    ? `Ola! Fiz o pedido #${pedidoId} e pagarei em dinheiro na entrega. Codigo de acompanhamento: ${document.getElementById('codigo-acompanhamento').textContent}.`
+    : `Ola! Realizei o pedido #${pedidoId}. Codigo de acompanhamento: ${document.getElementById('codigo-acompanhamento').textContent}.`;
   const destinoWhatsapp = `https://wa.me/${numeroWhatsapp}?text=` + encodeURIComponent(mensagemWhatsapp);
   const ordemEtapas = ['FILA_DE_ESPERA', 'PREPARANDO', 'PRONTO', 'SAIU_PARA_ENTREGA', 'ENTREGUE'];
-  let redirecionado = false;
-
   document.getElementById('botao-whatsapp').href = destinoWhatsapp;
   document.getElementById('copiar-codigo').addEventListener('click', async () => {
     const botao = document.getElementById('copiar-codigo');
@@ -83,14 +78,9 @@
 
   function mostrarConfirmacao() {
     document.getElementById('confirmacao').textContent = pedidoEmDinheiro
-      ? 'Pedido registrado. Voce sera direcionado ao WhatsApp da empresa.'
-      : 'Pagamento aprovado. Voce sera direcionado ao WhatsApp da empresa.';
+      ? 'Pedido registrado. Use o botao abaixo se quiser falar com a empresa.'
+      : 'Pagamento aprovado. Use o botao abaixo se quiser falar com a empresa.';
     document.getElementById('confirmacao').classList.remove('d-none');
-    document.getElementById('botao-whatsapp').classList.remove('d-none');
-    if (redirecionarAoWhatsapp && !redirecionado) {
-      redirecionado = true;
-      setTimeout(() => { window.location.href = destinoWhatsapp; }, 2500);
-    }
   }
 
   async function consultarStatus() {
@@ -100,11 +90,11 @@
       document.getElementById('status-pagamento').textContent = dados.status_pagamento;
       document.getElementById('status-operacional').textContent = dados.nome_status_operacional;
       atualizarEtapas(dados.status_operacional);
-      if (dados.status_pagamento === 'APROVADO' || (pedidoEmDinheiro && redirecionarAoWhatsapp)) mostrarConfirmacao();
+      if (dados.status_pagamento === 'APROVADO' || pedidoEmDinheiro) mostrarConfirmacao();
     } catch (_) {}
   }
 
-  if (pedidoEmDinheiro && redirecionarAoWhatsapp) mostrarConfirmacao();
+  if (pedidoEmDinheiro) mostrarConfirmacao();
   consultarStatus();
   setInterval(consultarStatus, 5000);
 </script>

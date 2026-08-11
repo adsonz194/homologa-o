@@ -332,9 +332,7 @@ def finalizar():
     pedido = obter_pedido(pedido_id)
     if forma_pagamento == "DINHEIRO":
         flash("Pedido registrado. O entregador levara o troco informado.", "success")
-        # Dinheiro ainda sera recebido pelo entregador, mas o pedido ja foi
-        # confirmado pela loja e deve chegar ao WhatsApp imediatamente.
-        return redirect(url_for("cliente.pedido", codigo=pedido["codigo_acompanhamento"], whatsapp="1"))
+        return redirect(url_for("cliente.pedido", codigo=pedido["codigo_acompanhamento"]))
     session["pedido_pagamento_pendente"] = pedido_id
     # Mantemos o mesmo encadeamento HTTP simples que era usado no checkout
     # original: formulario -> rota do checkout -> Mercado Pago. Nao ha pagina
@@ -354,7 +352,7 @@ def iniciar_pagamento(pedido_id):
     return redirect(url_for("pagamentos.criar_checkout_pedido", pedido_id=pedido_id))
 
 
-def renderizar_pedido(pedido_atual, retorno_checkout=False):
+def renderizar_pedido(pedido_atual):
     codigo = pedido_atual["codigo_acompanhamento"]
     return render_template(
         "pedido.html",
@@ -362,10 +360,6 @@ def renderizar_pedido(pedido_atual, retorno_checkout=False):
         codigo_acompanhamento=codigo,
         nome_status_operacional=STATUS_OPERACIONAL_NOMES.get(pedido_atual["status_operacional"], "Em atualizacao"),
         url_status=url_for("cliente.status_pedido", codigo=codigo),
-        url_acompanhamento=(
-            f"{obter_url_publica_estabelecimento(pedido_atual['estabelecimento_id'])}"
-            f"{url_for('cliente.pedido', codigo=codigo)}"
-        ),
         url_reiniciar_pagamento=url_for("cliente.reiniciar_pagamento", codigo=codigo),
         url_nota_pdf=url_for("cliente.nota_pdf", codigo=codigo),
         url_entrega=(
@@ -373,7 +367,6 @@ def renderizar_pedido(pedido_atual, retorno_checkout=False):
             f"{url_for('cliente.confirmar_entrega', codigo=codigo)}"
         ) if pedido_atual["modalidade_entrega"] == "ENTREGA" else "",
         whatsapp_empresa=obter_whatsapp_estabelecimento(pedido_atual["estabelecimento_id"]),
-        retorno_checkout=retorno_checkout,
     )
 
 
@@ -436,7 +429,7 @@ def retorno_checkout_codigo(codigo):
             )
         except Exception:
             current_app.logger.exception("Falha ao confirmar retorno do Checkout do pedido %s", pedido_atual["id"])
-    return renderizar_pedido(pedido_atual, retorno_checkout=bool(payment_id) or request.args.get("retorno") == "checkout")
+    return renderizar_pedido(pedido_atual)
 
 
 @cliente_bp.get("/cliente/acompanhamento/<codigo>")
@@ -444,7 +437,7 @@ def pedido(codigo):
     pedido_atual = obter_pedido_por_codigo(codigo)
     if pedido_atual is None:
         return "Pedido nao encontrado", 404
-    return renderizar_pedido(pedido_atual, retorno_checkout=request.args.get("whatsapp") == "1")
+    return renderizar_pedido(pedido_atual)
 
 
 @cliente_bp.get("/cliente/acompanhamento/<codigo>/status")
