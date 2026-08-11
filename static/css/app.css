@@ -180,6 +180,9 @@ body.app-body {
   .table.mobile-cards td[data-label="Ações"]::before { display: block; margin-bottom: .55rem; }
   .table.mobile-cards .order-actions { display: grid !important; grid-template-columns: 1fr; gap: .55rem !important; }
   .table.mobile-cards .order-actions .form-select, .table.mobile-cards .order-actions .btn { width: 100%; }
+  .table.mobile-cards td[data-label="Quantidade"] form { display: grid !important; flex: 1 1 auto; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .5rem !important; }
+  .table.mobile-cards td[data-label="Quantidade"] form .form-control { width: 100%; max-width: none !important; min-width: 0; }
+  .table.mobile-cards td[data-label="Quantidade"] form .btn { min-height: 44px; padding-right: .8rem; padding-left: .8rem; white-space: nowrap; }
   .table.mobile-cards .empty-state { padding: 1.6rem 0; }
   .table.mobile-cards .empty-state::before { display: none; }
   .form-control, .form-select { font-size: 16px; }
