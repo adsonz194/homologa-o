@@ -58,7 +58,8 @@ def status_funcionamento_estabelecimento(estabelecimento, agora=None):
 
 
 def listar_locais_entrega(estabelecimento_id, somente_ativos=False):
-    consulta = """SELECT id, nome, horario_abertura, horario_encerramento, ativo, criado_em
+    consulta = """SELECT id, nome, horario_abertura, horario_encerramento, valor_entrega,
+                         pedido_minimo, prazo_estimado_minutos, ativo, criado_em
                   FROM locais_entrega WHERE estabelecimento_id = ?"""
     parametros = [estabelecimento_id]
     if somente_ativos:
@@ -68,7 +69,8 @@ def listar_locais_entrega(estabelecimento_id, somente_ativos=False):
 
 
 def obter_local_entrega(local_id, estabelecimento_id, somente_ativos=False):
-    consulta = """SELECT id, nome, horario_abertura, horario_encerramento, ativo, criado_em
+    consulta = """SELECT id, nome, horario_abertura, horario_encerramento, valor_entrega,
+                         pedido_minimo, prazo_estimado_minutos, ativo, criado_em
                   FROM locais_entrega WHERE id = ? AND estabelecimento_id = ?"""
     parametros = [local_id, estabelecimento_id]
     if somente_ativos:
@@ -76,23 +78,32 @@ def obter_local_entrega(local_id, estabelecimento_id, somente_ativos=False):
     return get_db().execute(consulta, parametros).fetchone()
 
 
-def criar_local_entrega(estabelecimento_id, nome, horario_abertura, horario_encerramento):
+def criar_local_entrega(
+    estabelecimento_id, nome, horario_abertura, horario_encerramento,
+    valor_entrega, pedido_minimo, prazo_estimado_minutos,
+):
     db = get_db()
     cursor = db.execute(
-        """INSERT INTO locais_entrega (estabelecimento_id, nome, horario_abertura, horario_encerramento)
-           VALUES (?, ?, ?, ?)""",
-        (estabelecimento_id, nome, horario_abertura, horario_encerramento),
+        """INSERT INTO locais_entrega
+           (estabelecimento_id, nome, horario_abertura, horario_encerramento, valor_entrega, pedido_minimo, prazo_estimado_minutos)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (estabelecimento_id, nome, horario_abertura, horario_encerramento, valor_entrega, pedido_minimo, prazo_estimado_minutos),
     )
     db.commit()
     return cursor.lastrowid
 
 
-def atualizar_local_entrega(local_id, estabelecimento_id, nome, horario_abertura, horario_encerramento):
+def atualizar_local_entrega(
+    local_id, estabelecimento_id, nome, horario_abertura, horario_encerramento,
+    valor_entrega, pedido_minimo, prazo_estimado_minutos,
+):
     db = get_db()
     cursor = db.execute(
-        """UPDATE locais_entrega SET nome = ?, horario_abertura = ?, horario_encerramento = ?
+        """UPDATE locais_entrega SET nome = ?, horario_abertura = ?, horario_encerramento = ?,
+           valor_entrega = ?, pedido_minimo = ?, prazo_estimado_minutos = ?
            WHERE id = ? AND estabelecimento_id = ?""",
-        (nome, horario_abertura, horario_encerramento, local_id, estabelecimento_id),
+        (nome, horario_abertura, horario_encerramento, valor_entrega, pedido_minimo, prazo_estimado_minutos,
+         local_id, estabelecimento_id),
     )
     db.commit()
     return cursor.rowcount == 1
@@ -116,6 +127,32 @@ def excluir_local_entrega(local_id, estabelecimento_id):
     )
     db.commit()
     return cursor.rowcount == 1
+
+
+def registrar_auditoria(estabelecimento_id, usuario, acao, recurso="", recurso_id=None, detalhe=""):
+    """Registra uma acao do painel sem guardar credenciais ou dados de pagamento."""
+    db = get_db()
+    db.execute(
+        """INSERT INTO auditoria
+           (estabelecimento_id, usuario_id, usuario_nome, acao, recurso, recurso_id, detalhe)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (
+            estabelecimento_id,
+            usuario["id"] if usuario else None,
+            str(usuario["nome"] if usuario else "Sistema")[:120],
+            str(acao)[:120], str(recurso)[:80], recurso_id,
+            str(detalhe or "")[:300],
+        ),
+    )
+    db.commit()
+
+
+def listar_auditoria(estabelecimento_id, limite=300):
+    return get_db().execute(
+        """SELECT id, usuario_nome, acao, recurso, recurso_id, detalhe, criado_em
+           FROM auditoria WHERE estabelecimento_id = ? ORDER BY id DESC LIMIT ?""",
+        (estabelecimento_id, max(1, min(int(limite), 1000))),
+    ).fetchall()
 
 
 def status_entrega_local(estabelecimento, local, agora=None):
@@ -410,23 +447,32 @@ def atualizar_pagamento(venda_id, status, payment_id=None):
         )
 
 
-def criar_produto(codigo_interno, ean, descricao, valor_unitario, estoque, disponivel, estabelecimento_id):
+def criar_produto(
+    codigo_interno, ean, descricao, valor_unitario, estoque, disponivel,
+    categoria, imagem_url, estabelecimento_id,
+):
     db = get_db()
     cursor = db.execute(
-        """INSERT INTO produtos (codigo_interno, ean, descricao, valor_unitario, estoque, disponivel, estabelecimento_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (codigo_interno, ean or None, descricao, valor_unitario, estoque, int(disponivel), estabelecimento_id),
+        """INSERT INTO produtos
+           (codigo_interno, ean, descricao, valor_unitario, estoque, disponivel, categoria, imagem_url, estabelecimento_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (codigo_interno, ean or None, descricao, valor_unitario, estoque, int(disponivel), categoria, imagem_url, estabelecimento_id),
     )
     db.commit()
     return cursor.lastrowid
 
 
-def atualizar_produto(produto_id, codigo_interno, ean, descricao, valor_unitario, estoque, disponivel, estabelecimento_id):
+def atualizar_produto(
+    produto_id, codigo_interno, ean, descricao, valor_unitario, estoque,
+    disponivel, categoria, imagem_url, estabelecimento_id,
+):
     db = get_db()
     db.execute(
-        """UPDATE produtos SET codigo_interno = ?, ean = ?, descricao = ?, valor_unitario = ?, estoque = ?, disponivel = ?
+        """UPDATE produtos SET codigo_interno = ?, ean = ?, descricao = ?, valor_unitario = ?, estoque = ?, disponivel = ?,
+           categoria = ?, imagem_url = ?
            WHERE id = ? AND estabelecimento_id = ?""",
-        (codigo_interno, ean or None, descricao, valor_unitario, estoque, int(disponivel), produto_id, estabelecimento_id),
+        (codigo_interno, ean or None, descricao, valor_unitario, estoque, int(disponivel), categoria, imagem_url,
+         produto_id, estabelecimento_id),
     )
     db.commit()
 
@@ -485,12 +531,16 @@ def complementos_selecionados(produto_id, ids_complementos):
 
 
 def listar_produtos(estabelecimento_id):
-    return get_db().execute("SELECT * FROM produtos WHERE estabelecimento_id = ? ORDER BY descricao COLLATE NOCASE", (estabelecimento_id,)).fetchall()
+    return get_db().execute(
+        "SELECT * FROM produtos WHERE estabelecimento_id = ? ORDER BY categoria COLLATE NOCASE, descricao COLLATE NOCASE",
+        (estabelecimento_id,),
+    ).fetchall()
 
 
 def listar_produtos_disponiveis(estabelecimento_id):
     return get_db().execute(
-        "SELECT * FROM produtos WHERE estabelecimento_id = ? AND disponivel = 1 AND estoque > 0 ORDER BY descricao COLLATE NOCASE", (estabelecimento_id,)
+        """SELECT * FROM produtos WHERE estabelecimento_id = ? AND disponivel = 1 AND estoque > 0
+           ORDER BY categoria COLLATE NOCASE, descricao COLLATE NOCASE""", (estabelecimento_id,)
     ).fetchall()
 
 
@@ -566,6 +616,7 @@ def gerar_codigo_entrega():
 def criar_pedido(
     cliente, telefone, endereco, local_entrega, modalidade_entrega, email,
     forma_pagamento, carrinho, estabelecimento_id, valor_recebido=None,
+    valor_entrega=0, prazo_entrega_minutos=None, observacao="", agendado_para=None,
 ):
     itens = detalhes_carrinho(carrinho, estabelecimento_id)
     if not itens:
@@ -575,7 +626,12 @@ def criar_pedido(
         raise EstoqueInsuficiente("Estabelecimento indisponivel.")
     db = get_db()
     with db:
-        valor_entrega = estabelecimento["valor_entrega"] if modalidade_entrega == "ENTREGA" else 0
+        if modalidade_entrega != "ENTREGA":
+            valor_entrega = 0
+            prazo_entrega_minutos = None
+        valor_entrega = round(float(valor_entrega or 0), 2)
+        if valor_entrega < 0:
+            raise ValueError("Taxa de entrega invalida.")
         total = valor_entrega
         for item in itens:
             produto = db.execute("SELECT * FROM produtos WHERE id = ? AND estabelecimento_id = ?", (item["produto"]["id"], estabelecimento_id)).fetchone()
@@ -597,11 +653,13 @@ def criar_pedido(
         cursor = db.execute(
             """INSERT INTO pedidos
                (cliente, telefone, endereco, local_entrega, modalidade_entrega, email, forma_pagamento, valor_total, valor_entrega,
-                valor_recebido, troco, codigo_acompanhamento, codigo_entrega, status_operacional, estabelecimento_id, estoque_reservado)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
+                valor_recebido, troco, codigo_acompanhamento, codigo_entrega, status_operacional, estabelecimento_id,
+                observacao, agendado_para, prazo_entrega_minutos, estoque_reservado)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
             (
                 cliente, telefone, endereco, local_entrega, modalidade_entrega, email, forma_pagamento, total, valor_entrega,
                 valor_recebido, troco, codigo_acompanhamento, codigo_entrega, status_operacional, estabelecimento_id,
+                observacao, agendado_para, prazo_entrega_minutos,
             ),
         )
         pedido_id = cursor.lastrowid

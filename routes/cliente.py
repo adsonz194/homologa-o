@@ -1,5 +1,6 @@
 from io import BytesIO
 import math
+from datetime import datetime, timedelta
 
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, send_file, session, url_for
 
@@ -26,6 +27,7 @@ from models import (
     obter_local_entrega,
     status_entrega_local,
     status_funcionamento_estabelecimento,
+    data_hora_loja,
 )
 from nota_pdf import gerar_comprovante_pedido_pdf
 
@@ -115,10 +117,14 @@ def renderizar_loja():
         return "Delivery indisponivel", 503
     session["estabelecimento_publico_id"] = estabelecimento["id"]
     produtos = listar_produtos_disponiveis(estabelecimento["id"])
+    produtos_por_categoria = {}
+    for produto in produtos:
+        produtos_por_categoria.setdefault(produto["categoria"] or "Geral", []).append(produto)
     carrinho = carrinho_atual()
     return render_template(
         "cliente.html",
         produtos=produtos,
+        produtos_por_categoria=produtos_por_categoria,
         complementos_por_produto=listar_complementos_por_produto(produtos),
         quantidade_carrinho=sum(item["quantidade"] for item in carrinho.values()),
         estabelecimento=estabelecimento,
@@ -136,10 +142,6 @@ def adicionar_ao_carrinho(produto_id):
     estabelecimento = estabelecimento_principal()
     if estabelecimento is None:
         return "Delivery indisponivel", 503
-    funcionamento = status_funcionamento_estabelecimento(estabelecimento)
-    if not funcionamento["aberto"]:
-        flash(funcionamento["mensagem"], "warning")
-        return redirect(url_for("cliente.loja"))
     try:
         quantidade = int(request.form.get("quantidade", 1))
         if quantidade <= 0:
@@ -235,15 +237,12 @@ def finalizar():
     if estabelecimento is None:
         return "Delivery indisponivel", 503
     funcionamento = status_funcionamento_estabelecimento(estabelecimento)
-    if not funcionamento["aberto"]:
-        flash(funcionamento["mensagem"], "warning")
-        return redirect(url_for("cliente.carrinho"))
     itens = detalhes_carrinho(carrinho_atual(), estabelecimento["id"])
     if not itens:
         flash("Seu carrinho esta vazio.", "warning")
         return redirect(url_for("cliente.loja"))
     subtotal = sum(item["subtotal"] for item in itens)
-    total = subtotal + estabelecimento["valor_entrega"]
+    total = subtotal
     locais_entrega = listar_locais_entrega(estabelecimento["id"], somente_ativos=True)
     if request.method == "GET":
         return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=locais_entrega)
@@ -257,11 +256,35 @@ def finalizar():
     local = obter_local_entrega(local_id, estabelecimento["id"], somente_ativos=True) if local_id else None
     modalidade_entrega = request.form.get("modalidade_entrega", "ENTREGA")
     forma_pagamento = request.form.get("forma_pagamento", "")
+    observacao = " ".join(request.form.get("observacao", "").split())
+    agendado_texto = request.form.get("agendado_para", "").strip()
+    agendado_para = None
+    momento_atendimento = data_hora_loja()
+    if agendado_texto:
+        try:
+            agendado = datetime.strptime(agendado_texto, "%Y-%m-%dT%H:%M")
+            agora_local = data_hora_loja().replace(tzinfo=None)
+            if not agora_local.replace(second=0, microsecond=0) < agendado <= agora_local.replace(second=0, microsecond=0) + timedelta(days=7):
+                raise ValueError
+            agendado_para = agendado.strftime("%Y-%m-%d %H:%M")
+            momento_atendimento = agendado
+        except ValueError:
+            flash("Escolha um agendamento entre os proximos 7 dias.", "danger")
+            return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=locais_entrega), 400
+    elif not funcionamento["aberto"]:
+        flash(f"{funcionamento['mensagem']} Escolha um horario para agendar o pedido.", "warning")
+        return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=locais_entrega), 400
+    if agendado_para:
+        funcionamento_agendado = status_funcionamento_estabelecimento(estabelecimento, momento_atendimento)
+        if not funcionamento_agendado["aberto"]:
+            flash(f"A loja nao atende nesse horario. {funcionamento_agendado['mensagem']}", "warning")
+            return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=locais_entrega), 400
     valor_recebido = None
     telefone_numeros = "".join(caractere for caractere in telefone if caractere.isdigit())
     if (
         not 2 <= len(cliente) <= 100
         or not 8 <= len(telefone_numeros) <= 15
+        or len(observacao) > 500
         or modalidade_entrega not in MODALIDADES_ENTREGA
         or forma_pagamento not in FORMAS_PAGAMENTO
     ):
@@ -271,15 +294,22 @@ def finalizar():
         if not 8 <= len(endereco) <= 300 or local is None:
             flash("Informe o local e o endereco completo para entrega.", "danger")
             return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=locais_entrega), 400
-        funcionamento_local = status_entrega_local(estabelecimento, local)
+        funcionamento_local = status_entrega_local(estabelecimento, local, momento_atendimento)
         if not funcionamento_local["aberto"]:
             flash(funcionamento_local["mensagem"], "warning")
             return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=locais_entrega), 400
         local_entrega = local["nome"]
+        valor_entrega = float(local["valor_entrega"])
+        prazo_entrega_minutos = int(local["prazo_estimado_minutos"])
+        if subtotal < float(local["pedido_minimo"]):
+            flash(f"O pedido minimo para {local['nome']} e R$ {float(local['pedido_minimo']):.2f}.", "warning")
+            return render_template("finalizar.html", itens=itens, subtotal=subtotal, total=total, estabelecimento=estabelecimento, locais_entrega=locais_entrega), 400
     else:
         endereco = "Retirada na loja"
         local_entrega = "Retirada na loja"
-    total_cobravel = subtotal + (estabelecimento["valor_entrega"] if modalidade_entrega == "ENTREGA" else 0)
+        valor_entrega = 0
+        prazo_entrega_minutos = None
+    total_cobravel = subtotal + valor_entrega
     if forma_pagamento == "DINHEIRO":
         try:
             valor_recebido = _valor_monetario(request.form.get("valor_recebido", ""))
@@ -292,6 +322,8 @@ def finalizar():
         pedido_id = criar_pedido(
             cliente, telefone, endereco, local_entrega, modalidade_entrega, "", forma_pagamento,
             carrinho_atual(), estabelecimento["id"], valor_recebido,
+            valor_entrega=valor_entrega, prazo_entrega_minutos=prazo_entrega_minutos,
+            observacao=observacao, agendado_para=agendado_para,
         )
     except (EstoqueInsuficiente, ValueError) as erro:
         flash(str(erro), "danger")

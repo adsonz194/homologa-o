@@ -11,6 +11,7 @@ from models import (
     listar_pedidos_aprovados_apos,
     obter_estabelecimento,
     obter_pedido,
+    registrar_auditoria,
 )
 from nota_pdf import gerar_comprovante_pedido_pdf
 from routes.auth import permission_required
@@ -119,6 +120,7 @@ def atualizar_status(pedido_id):
             return redirect(url_for("pedidos.index"))
         liberar_estoque_pedido(pedido_id)
     atualizar_status_operacional_pedido(pedido_id, status)
+    registrar_auditoria(g.usuario["estabelecimento_id"], g.usuario, "Atualizou status do pedido", "PEDIDO", pedido_id, status)
     if status != "CANCELADO":
         flash("Status operacional atualizado.", "success")
     return redirect(url_for("pedidos.index"))

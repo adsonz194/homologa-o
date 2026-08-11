@@ -10,6 +10,7 @@
         <p class="small text-muted mb-3">Codigo de acompanhamento: <code id="codigo-acompanhamento">{{ codigo_acompanhamento }}</code> <button class="btn btn-link btn-sm p-0 align-baseline" type="button" id="copiar-codigo">Copiar</button></p>
         <p class="mb-1"><strong>Total:</strong> R$ {{ '%.2f'|format(pedido.valor_total) }}</p>
         <p class="mb-4">Pagamento: <strong id="status-pagamento">{{ pedido.status_pagamento }}</strong></p>
+        {% if pedido.agendado_para %}<div class="alert alert-primary text-start small"><strong>Pedido agendado para {{ pedido.agendado_para }}.</strong><br>O pagamento e confirmado agora; a preparacao seguira o horario solicitado.</div>{% elif pedido.prazo_entrega_minutos %}<p class="small text-muted">Previsao de entrega: cerca de {{ pedido.prazo_entrega_minutos }} minutos.</p>{% endif %}
         {% if pedido.forma_pagamento == 'DINHEIRO' %}
           <div class="alert alert-warning text-start small">Pagamento em <strong>dinheiro na entrega</strong>.<br>Valor informado: <strong>R$ {{ '%.2f'|format(pedido.valor_recebido) }}</strong> &middot; Troco: <strong>R$ {{ '%.2f'|format(pedido.troco) }}</strong>.</div>
         {% endif %}

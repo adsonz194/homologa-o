@@ -69,6 +69,8 @@ def init_db():
         ean TEXT UNIQUE,
         descricao TEXT NOT NULL,
         valor_unitario REAL NOT NULL CHECK(valor_unitario > 0),
+        categoria TEXT NOT NULL DEFAULT 'Geral',
+        imagem_url TEXT NOT NULL DEFAULT '',
         criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )""")
     db.execute("""CREATE TABLE IF NOT EXISTS produto_complementos (
@@ -134,6 +136,9 @@ def init_db():
         codigo_acompanhamento TEXT,
         codigo_entrega TEXT,
         entregue_em TEXT,
+        observacao TEXT NOT NULL DEFAULT '',
+        agendado_para TEXT,
+        prazo_entrega_minutos INTEGER,
         estoque_reservado INTEGER NOT NULL DEFAULT 0,
         criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )""")
@@ -160,10 +165,26 @@ def init_db():
         nome TEXT NOT NULL,
         horario_abertura TEXT NOT NULL DEFAULT '00:00',
         horario_encerramento TEXT NOT NULL,
+        valor_entrega REAL NOT NULL DEFAULT 0 CHECK(valor_entrega >= 0),
+        pedido_minimo REAL NOT NULL DEFAULT 0 CHECK(pedido_minimo >= 0),
+        prazo_estimado_minutos INTEGER NOT NULL DEFAULT 45 CHECK(prazo_estimado_minutos BETWEEN 5 AND 360),
         ativo INTEGER NOT NULL DEFAULT 1 CHECK(ativo IN (0, 1)),
         criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(estabelecimento_id) REFERENCES estabelecimentos(id) ON DELETE CASCADE,
         UNIQUE(estabelecimento_id, nome COLLATE NOCASE)
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS auditoria (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        estabelecimento_id INTEGER NOT NULL,
+        usuario_id INTEGER,
+        usuario_nome TEXT NOT NULL DEFAULT '',
+        acao TEXT NOT NULL,
+        recurso TEXT NOT NULL DEFAULT '',
+        recurso_id INTEGER,
+        detalhe TEXT NOT NULL DEFAULT '',
+        criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(estabelecimento_id) REFERENCES estabelecimentos(id) ON DELETE CASCADE,
+        FOREIGN KEY(usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
     )""")
     estabelecimento_padrao = db.execute(
         "SELECT id FROM estabelecimentos WHERE slug = ? COLLATE NOCASE",
@@ -260,6 +281,10 @@ def init_db():
         db.execute("ALTER TABLE produtos ADD COLUMN estoque INTEGER NOT NULL DEFAULT 0")
     if "estabelecimento_id" not in colunas_produtos:
         db.execute("ALTER TABLE produtos ADD COLUMN estabelecimento_id INTEGER")
+    if "categoria" not in colunas_produtos:
+        db.execute("ALTER TABLE produtos ADD COLUMN categoria TEXT NOT NULL DEFAULT 'Geral'")
+    if "imagem_url" not in colunas_produtos:
+        db.execute("ALTER TABLE produtos ADD COLUMN imagem_url TEXT NOT NULL DEFAULT ''")
     colunas_pedidos = {coluna["name"] for coluna in db.execute("PRAGMA table_info(pedidos)")}
     if "status_operacional" not in colunas_pedidos:
         db.execute("ALTER TABLE pedidos ADD COLUMN status_operacional TEXT NOT NULL DEFAULT 'PENDENTE'")
@@ -289,6 +314,12 @@ def init_db():
         db.execute("ALTER TABLE pedidos ADD COLUMN codigo_entrega TEXT")
     if "entregue_em" not in colunas_pedidos:
         db.execute("ALTER TABLE pedidos ADD COLUMN entregue_em TEXT")
+    if "observacao" not in colunas_pedidos:
+        db.execute("ALTER TABLE pedidos ADD COLUMN observacao TEXT NOT NULL DEFAULT ''")
+    if "agendado_para" not in colunas_pedidos:
+        db.execute("ALTER TABLE pedidos ADD COLUMN agendado_para TEXT")
+    if "prazo_entrega_minutos" not in colunas_pedidos:
+        db.execute("ALTER TABLE pedidos ADD COLUMN prazo_entrega_minutos INTEGER")
     colunas_usuarios = {coluna["name"] for coluna in db.execute("PRAGMA table_info(usuarios)")}
     if "estabelecimento_id" not in colunas_usuarios:
         db.execute("ALTER TABLE usuarios ADD COLUMN estabelecimento_id INTEGER")
@@ -301,6 +332,19 @@ def init_db():
     }
     if "horario_abertura" not in colunas_locais_entrega:
         db.execute("ALTER TABLE locais_entrega ADD COLUMN horario_abertura TEXT NOT NULL DEFAULT '00:00'")
+    if "valor_entrega" not in colunas_locais_entrega:
+        db.execute("ALTER TABLE locais_entrega ADD COLUMN valor_entrega REAL NOT NULL DEFAULT 0")
+        db.execute(
+            """UPDATE locais_entrega
+               SET valor_entrega = COALESCE((
+                    SELECT valor_entrega FROM estabelecimentos
+                    WHERE estabelecimentos.id = locais_entrega.estabelecimento_id
+               ), 0)"""
+        )
+    if "pedido_minimo" not in colunas_locais_entrega:
+        db.execute("ALTER TABLE locais_entrega ADD COLUMN pedido_minimo REAL NOT NULL DEFAULT 0")
+    if "prazo_estimado_minutos" not in colunas_locais_entrega:
+        db.execute("ALTER TABLE locais_entrega ADD COLUMN prazo_estimado_minutos INTEGER NOT NULL DEFAULT 45")
     for tabela in ("vendas", "produtos", "pedidos", "usuarios"):
         db.execute(
             f"UPDATE {tabela} SET estabelecimento_id = ? WHERE estabelecimento_id IS NULL",
@@ -325,6 +369,9 @@ def init_db():
     db.execute("CREATE INDEX IF NOT EXISTS idx_solicitacoes_recuperacao_ip_data ON solicitacoes_recuperacao_senha(endereco_ip, criado_em)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_tentativas_entrega_pedido_ip_data ON tentativas_entrega(pedido_id, endereco_ip, criado_em)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_locais_entrega_estabelecimento ON locais_entrega(estabelecimento_id, ativo, nome)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_estabelecimento_data ON auditoria(estabelecimento_id, id DESC)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_produtos_categoria ON produtos(estabelecimento_id, categoria, descricao)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_pedidos_agendado ON pedidos(estabelecimento_id, agendado_para)")
     db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_pedidos_codigo_acompanhamento ON pedidos(codigo_acompanhamento)")
     db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_estabelecimentos_instalacao ON estabelecimentos(identificador_instalacao)")
     db.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_email_recuperacao

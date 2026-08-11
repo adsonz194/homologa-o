@@ -2,17 +2,14 @@
 {% block title %}{{ estabelecimento.nome }} | Delivery{% endblock %}
 {% block content %}
 <section class="food-storebar">
-  <div>
-    <div class="food-store-title">Delivery online</div>
-    <p>{{ estabelecimento.nome }} &middot; escolha, personalize e peça.</p>
-  </div>
+  <div><div class="food-store-title">Delivery online</div><p>{{ estabelecimento.nome }} &middot; escolha, personalize e peca.</p></div>
   <a class="cart-quick-link food-cart-link" href="{{ url_for('cliente.carrinho') }}"><i class="cart-icon" aria-hidden="true">&#128722;</i>Carrinho{% if quantidade_carrinho %}<span>{{ quantidade_carrinho }}</span>{% endif %}</a>
 </section>
 
 {% if funcionamento.aberto %}
   <div class="food-store-status open"><span aria-hidden="true"></span>{{ funcionamento.mensagem }}</div>
 {% else %}
-  <div class="food-store-status closed"><span aria-hidden="true"></span><strong>Delivery fechado.</strong> {{ funcionamento.mensagem }} Horario normal: {{ funcionamento.horario }}.</div>
+  <div class="food-store-status closed"><span aria-hidden="true"></span><strong>Delivery fechado.</strong> {{ funcionamento.mensagem }} Voce pode montar o carrinho e agendar o pedido.</div>
 {% endif %}
 
 <section class="food-menu-heading">
@@ -20,42 +17,34 @@
   <a class="food-track-link" href="{{ url_for('cliente.acompanhar_pedido') }}">Acompanhar pedido</a>
 </section>
 
-<div class="row g-3 food-grid">
-  {% for produto in produtos %}
-    {% set complementos = complementos_por_produto[produto.id] %}
-    <div class="col-sm-6 col-lg-4"><article class="card food-product-card">
-      <div class="card-body">
-        <div class="food-product-top">
-          <div><h2>{{ produto.descricao }}</h2><p>Disponivel agora</p></div>
-          <span class="food-product-icon" aria-hidden="true">&#127869;</span>
-        </div>
-        <p class="food-product-price">R$ {{ '%.2f'|format(produto.valor_unitario) }}</p>
-        {% if complementos %}<p class="food-personalize-hint">Personalize com acompanhamentos e molhos</p>{% endif %}
-        <form method="post" action="{{ url_for('cliente.adicionar_ao_carrinho', produto_id=produto.id) }}" class="food-add-form">
-          {% if complementos %}
-            <details class="food-options">
-              <summary>Personalizar pedido <small>opcional</small></summary>
-              <div class="food-options-list">
-                {% for complemento in complementos %}
-                  <label class="food-option">
-                    <input type="checkbox" name="complementos" value="{{ complemento.id }}">
-                    <span>{{ complemento.descricao }}</span>
-                    <strong>{% if complemento.valor_adicional > 0 %}+ R$ {{ '%.2f'|format(complemento.valor_adicional) }}{% else %}Gratis{% endif %}</strong>
-                  </label>
-                {% endfor %}
-              </div>
-            </details>
-          {% endif %}
-          <div class="food-add-actions">
-            <label class="visually-hidden" for="quantidade-{{ produto.id }}">Quantidade de {{ produto.descricao }}</label>
-            <input class="form-control" id="quantidade-{{ produto.id }}" type="number" name="quantidade" min="1" max="{{ produto.estoque }}" value="1">
-            <button class="btn food-add-button" {% if not funcionamento.aberto %}disabled{% endif %}>Adicionar</button>
+{% if produtos_por_categoria|length > 1 %}
+  <nav class="d-flex gap-2 flex-wrap mb-4" aria-label="Categorias do cardapio">
+    {% for categoria in produtos_por_categoria %}<a class="btn btn-sm btn-outline-secondary rounded-pill" href="#categoria-{{ loop.index }}">{{ categoria }}</a>{% endfor %}
+  </nav>
+{% endif %}
+
+{% for categoria, itens_categoria in produtos_por_categoria.items() %}
+  <section id="categoria-{{ loop.index }}" class="mb-5">
+    {% if produtos_por_categoria|length > 1 %}<h2 class="h4 mb-3">{{ categoria }}</h2>{% endif %}
+    <div class="row g-3 food-grid">
+      {% for produto in itens_categoria %}
+        {% set complementos = complementos_por_produto[produto.id] %}
+        <div class="col-sm-6 col-lg-4"><article class="card food-product-card h-100">
+          {% if produto.imagem_url %}<img src="{{ produto.imagem_url }}" class="card-img-top" alt="{{ produto.descricao }}" loading="lazy" style="height: 172px; object-fit: cover">{% endif %}
+          <div class="card-body">
+            <div class="food-product-top"><div><h2>{{ produto.descricao }}</h2><p>{{ categoria }}</p></div>{% if not produto.imagem_url %}<span class="food-product-icon" aria-hidden="true">&#127869;</span>{% endif %}</div>
+            <p class="food-product-price">R$ {{ '%.2f'|format(produto.valor_unitario) }}</p>
+            {% if complementos %}<p class="food-personalize-hint">Personalize com acompanhamentos e molhos</p>{% endif %}
+            <form method="post" action="{{ url_for('cliente.adicionar_ao_carrinho', produto_id=produto.id) }}" class="food-add-form">
+              {% if complementos %}<details class="food-options"><summary>Personalizar pedido <small>opcional</small></summary><div class="food-options-list">{% for complemento in complementos %}<label class="food-option"><input type="checkbox" name="complementos" value="{{ complemento.id }}"><span>{{ complemento.descricao }}</span><strong>{% if complemento.valor_adicional > 0 %}+ R$ {{ '%.2f'|format(complemento.valor_adicional) }}{% else %}Gratis{% endif %}</strong></label>{% endfor %}</div></details>{% endif %}
+              <div class="food-add-actions"><label class="visually-hidden" for="quantidade-{{ produto.id }}">Quantidade de {{ produto.descricao }}</label><input class="form-control" id="quantidade-{{ produto.id }}" type="number" name="quantidade" min="1" max="{{ produto.estoque }}" value="1"><button class="btn food-add-button">Adicionar</button></div>
+            </form>
           </div>
-        </form>
-      </div>
-    </article></div>
-  {% else %}
-    <div class="col-12"><div class="card"><div class="empty-state"><h2 class="h5">Nenhum item disponivel agora</h2><p class="mb-0">Volte em alguns instantes para conferir o cardapio.</p></div></div></div>
-  {% endfor %}
-</div>
+        </article></div>
+      {% endfor %}
+    </div>
+  </section>
+{% else %}
+  <div class="card"><div class="empty-state"><h2 class="h5">Nenhum item disponivel agora</h2><p class="mb-0">Volte em alguns instantes para conferir o cardapio.</p></div></div>
+{% endfor %}
 {% endblock %}

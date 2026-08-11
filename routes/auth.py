@@ -28,6 +28,7 @@ from models import (
     invalidar_recuperacoes_senha,
     listar_funcionarios,
     listar_locais_entrega,
+    listar_auditoria,
     obter_estabelecimento,
     obter_funcionario,
     obter_segredo_webhook_mercadopago,
@@ -38,6 +39,7 @@ from models import (
     quantidade_tentativas_login,
     redefinir_senha_com_codigo,
     registrar_solicitacao_recuperacao,
+    registrar_auditoria,
     registrar_tentativa_login,
     status_certificado_estabelecimento,
     status_funcionamento_estabelecimento,
@@ -73,9 +75,17 @@ def _dados_local_entrega(formulario):
     nome = " ".join(formulario.get("nome", "").split())
     horario_abertura = _horario_valido(formulario.get("horario_abertura", ""))
     horario = _horario_valido(formulario.get("horario_encerramento", ""))
-    if not 2 <= len(nome) <= 80:
+    valor_entrega = _valor_monetario(formulario.get("valor_entrega", ""))
+    pedido_minimo = _valor_monetario(formulario.get("pedido_minimo", "0"))
+    prazo_estimado_minutos = int(formulario.get("prazo_estimado_minutos", ""))
+    if (
+        not 2 <= len(nome) <= 80
+        or not 0 <= valor_entrega <= 1_000
+        or not 0 <= pedido_minimo <= 10_000
+        or not 5 <= prazo_estimado_minutos <= 360
+    ):
         raise ValueError
-    return nome, horario_abertura, horario
+    return nome, horario_abertura, horario, valor_entrega, pedido_minimo, prazo_estimado_minutos
 
 
 def _cnpj_valido(cnpj):
@@ -376,15 +386,25 @@ def locais_entrega():
     )
 
 
+@auth_bp.get("/auditoria")
+@owner_required
+def auditoria():
+    return render_template(
+        "auditoria.html",
+        registros=listar_auditoria(g.usuario["estabelecimento_id"]),
+    )
+
+
 @auth_bp.post("/configuracoes/locais")
 @owner_required
 def novo_local_entrega():
     try:
-        nome, horario_abertura, horario = _dados_local_entrega(request.form)
-        criar_local_entrega(g.usuario["estabelecimento_id"], nome, horario_abertura, horario)
+        dados = _dados_local_entrega(request.form)
+        local_id = criar_local_entrega(g.usuario["estabelecimento_id"], *dados)
+        registrar_auditoria(g.usuario["estabelecimento_id"], g.usuario, "Criou local de entrega", "LOCAL", local_id, dados[0])
         flash("Local de entrega cadastrado.", "success")
     except (TypeError, ValueError):
-        flash("Informe um local com 2 a 80 caracteres e um horario valido.", "danger")
+        flash("Confira local, horario, taxa, pedido minimo e prazo de entrega.", "danger")
     except sqlite3.IntegrityError:
         flash("Este local ja esta cadastrado.", "danger")
     return redirect(url_for("auth.locais_entrega"))
@@ -394,12 +414,13 @@ def novo_local_entrega():
 @owner_required
 def editar_local_entrega(local_id):
     try:
-        nome, horario_abertura, horario = _dados_local_entrega(request.form)
-        if not atualizar_local_entrega(local_id, g.usuario["estabelecimento_id"], nome, horario_abertura, horario):
+        dados = _dados_local_entrega(request.form)
+        if not atualizar_local_entrega(local_id, g.usuario["estabelecimento_id"], *dados):
             return "Local nao encontrado", 404
+        registrar_auditoria(g.usuario["estabelecimento_id"], g.usuario, "Atualizou local de entrega", "LOCAL", local_id, dados[0])
         flash("Local de entrega atualizado.", "success")
     except (TypeError, ValueError):
-        flash("Informe um local com 2 a 80 caracteres e um horario valido.", "danger")
+        flash("Confira local, horario, taxa, pedido minimo e prazo de entrega.", "danger")
     except sqlite3.IntegrityError:
         flash("Ja existe outro local com este nome.", "danger")
     return redirect(url_for("auth.locais_entrega"))
@@ -411,6 +432,7 @@ def alterar_acesso_local_entrega(local_id):
     ativo = request.form.get("acao") == "ativar"
     if not definir_local_entrega_ativo(local_id, g.usuario["estabelecimento_id"], ativo):
         return "Local nao encontrado", 404
+    registrar_auditoria(g.usuario["estabelecimento_id"], g.usuario, "Alterou disponibilidade do local", "LOCAL", local_id, "Ativo" if ativo else "Pausado")
     flash("Local liberado para pedidos." if ativo else "Local pausado para novos pedidos.", "success")
     return redirect(url_for("auth.locais_entrega"))
 
@@ -420,6 +442,7 @@ def alterar_acesso_local_entrega(local_id):
 def excluir_local_entrega_rota(local_id):
     if not excluir_local_entrega(local_id, g.usuario["estabelecimento_id"]):
         return "Local nao encontrado", 404
+    registrar_auditoria(g.usuario["estabelecimento_id"], g.usuario, "Excluiu local de entrega", "LOCAL", local_id)
     flash("Local de entrega excluido. Pedidos antigos continuam no historico.", "success")
     return redirect(url_for("auth.locais_entrega"))
 

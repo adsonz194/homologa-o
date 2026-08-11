@@ -123,6 +123,12 @@ def gerar_comprovante_pedido_pdf(pedido, itens, estabelecimento):
     secoes.append(Paragraph(f"<b>TELEFONE:</b> {texto(pedido['telefone'])}", normal))
     recebimento = "RETIRADA NA LOJA" if pedido["modalidade_entrega"] == "RETIRADA" else f"ENTREGA - {texto(pedido['local_entrega'])}<br/>{texto(pedido['endereco'])}"
     secoes.append(Paragraph(f"<b>RECEBIMENTO:</b> {recebimento}", normal))
+    if pedido["agendado_para"]:
+        secoes.append(Paragraph(f"<b>AGENDADO PARA:</b> {texto(pedido['agendado_para'])}", normal))
+    elif pedido["prazo_entrega_minutos"]:
+        secoes.append(Paragraph(f"<b>PREVISAO DE ENTREGA:</b> cerca de {texto(pedido['prazo_entrega_minutos'])} minutos", normal))
+    if pedido["observacao"]:
+        secoes.append(Paragraph(f"<b>OBSERVACAO:</b> {texto(pedido['observacao'])}", normal))
     secoes.extend([Spacer(1, 1.6 * mm), _linha_horizontal(), Spacer(1, 1.4 * mm)])
 
     linhas = [[

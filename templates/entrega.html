@@ -9,6 +9,7 @@
       <p class="mb-1"><strong>Telefone:</strong> {{ pedido.telefone }}</p>
       <p class="mb-1"><strong>Endereco:</strong> {{ pedido.endereco }}</p>
       <p class="mb-0"><strong>Total:</strong> R$ {{ '%.2f'|format(pedido.valor_total) }} · {{ pedido.forma_pagamento }}</p>
+      {% if pedido.observacao %}<p class="mb-0 mt-2"><strong>Observacao:</strong> {{ pedido.observacao }}</p>{% endif %}
       {% if pedido.forma_pagamento == 'DINHEIRO' %}<p class="mb-0 mt-2 text-success"><strong>Receber:</strong> R$ {{ '%.2f'|format(pedido.valor_recebido) }} · <strong>Troco:</strong> R$ {{ '%.2f'|format(pedido.troco) }}</p>{% endif %}
     </div>
     {% if pedido.status_operacional == 'ENTREGUE' %}

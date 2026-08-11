@@ -1,57 +1,34 @@
 {% extends 'base.html' %}
 {% block title %}Finalizar pedido | Delivery{% endblock %}
 {% block content %}
-<div class="page-heading"><h1>Finalizar pedido</h1><p>Escolha entrega ou retirada e a forma de pagamento.</p></div>
+<div class="page-heading"><h1>Finalizar pedido</h1><p>Escolha entrega ou retirada, informe os detalhes e a forma de pagamento.</p></div>
 <div class="row g-4"><div class="col-lg-7"><div class="card shadow-sm"><div class="card-body p-md-4">
   <form method="post" class="row g-3" id="form-finalizar">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="col-12"><label class="form-label">Nome</label><input class="form-control" name="cliente" minlength="2" maxlength="100" required autocomplete="name" placeholder="Como devemos chamar voce?"></div>
     <div class="col-md-6"><label class="form-label">Telefone / WhatsApp</label><input class="form-control" name="telefone" inputmode="tel" maxlength="20" required autocomplete="tel" placeholder="(00) 00000-0000"></div>
-    <fieldset class="col-12"><legend class="form-label fs-6">Como deseja receber?</legend><div class="row g-2"><div class="col-sm-6"><label class="border rounded-3 p-3 d-block h-100{% if not locais_entrega %} opacity-50{% endif %}"><input class="form-check-input me-2" type="radio" name="modalidade_entrega" value="ENTREGA" {% if locais_entrega %}checked{% else %}disabled{% endif %}> <strong>Receber por delivery</strong><span class="d-block small text-muted mt-1">{% if locais_entrega %}A taxa de entrega sera incluida.{% else %}A loja ainda nao cadastrou locais atendidos.{% endif %}</span></label></div><div class="col-sm-6"><label class="border rounded-3 p-3 d-block h-100"><input class="form-check-input me-2" type="radio" name="modalidade_entrega" value="RETIRADA" {% if not locais_entrega %}checked{% endif %}> <strong>Retirar na loja</strong><span class="d-block small text-muted mt-1">Sem taxa de entrega.</span></label></div></div></fieldset>
-    <div id="dados-entrega" class="col-12 row g-3 mx-0 p-0"><div class="col-12"><label class="form-label">Local de entrega</label><select class="form-select" name="local_entrega" required><option value="" selected disabled>Selecione onde sera entregue</option>{% for local in locais_entrega %}<option value="{{ local.id }}">{{ local.nome }} - pedidos ate {{ local.horario_encerramento }}</option>{% endfor %}</select><div class="form-text">Selecione o local antes de informar o endereco completo.</div></div><div class="col-12"><label class="form-label">Endereco completo</label><textarea class="form-control" name="endereco" rows="4" minlength="8" maxlength="300" placeholder="Rua, numero, bairro e complemento" required></textarea></div></div>
+    <div class="col-md-6"><label class="form-label" for="agendado-para">Agendar para (opcional)</label><input class="form-control" id="agendado-para" name="agendado_para" type="datetime-local"><div class="form-text">Pagamento e confirmacao sao feitos agora. O pedido sera preparado no horario escolhido.</div></div>
+    <fieldset class="col-12"><legend class="form-label fs-6">Como deseja receber?</legend><div class="row g-2"><div class="col-sm-6"><label class="border rounded-3 p-3 d-block h-100{% if not locais_entrega %} opacity-50{% endif %}"><input class="form-check-input me-2" type="radio" name="modalidade_entrega" value="ENTREGA" {% if locais_entrega %}checked{% else %}disabled{% endif %}> <strong>Receber por delivery</strong><span class="d-block small text-muted mt-1">A taxa depende do local selecionado.</span></label></div><div class="col-sm-6"><label class="border rounded-3 p-3 d-block h-100"><input class="form-check-input me-2" type="radio" name="modalidade_entrega" value="RETIRADA" {% if not locais_entrega %}checked{% endif %}> <strong>Retirar na loja</strong><span class="d-block small text-muted mt-1">Sem taxa de entrega.</span></label></div></div></fieldset>
+    <div id="dados-entrega" class="col-12 row g-3 mx-0 p-0"><div class="col-12"><label class="form-label">Local de entrega</label><select class="form-select" name="local_entrega" required><option value="" selected disabled>Selecione onde sera entregue</option>{% for local in locais_entrega %}<option value="{{ local.id }}" data-taxa="{{ local.valor_entrega }}" data-minimo="{{ local.pedido_minimo }}" data-prazo="{{ local.prazo_estimado_minutos }}">{{ local.nome }} &middot; R$ {{ '%.2f'|format(local.valor_entrega) }} &middot; {{ local.prazo_estimado_minutos }} min</option>{% endfor %}</select><div class="form-text" id="ajuda-local">Selecione o local para ver a taxa, pedido minimo e prazo.</div></div><div class="col-12"><label class="form-label">Endereco completo</label><textarea class="form-control" name="endereco" rows="4" minlength="8" maxlength="300" placeholder="Rua, numero, bairro e complemento" required></textarea></div></div>
+    <div class="col-12"><label class="form-label" for="observacao">Observacao do pedido (opcional)</label><textarea class="form-control" id="observacao" name="observacao" rows="2" maxlength="500" placeholder="Ex.: sem cebola, ponto de referencia, cuidado com a embalagem"></textarea><div class="form-text">A observacao aparece no painel e no comprovante de preparacao.</div></div>
     <div class="col-12"><label class="form-label">Forma de pagamento</label><select class="form-select" name="forma_pagamento" id="forma-pagamento" required><option value="PIX">Pix</option><option value="CREDITO">Cartao de credito</option><option value="DEBITO">Cartao de debito</option><option value="DINHEIRO">Dinheiro na entrega</option></select><div class="form-text" id="ajuda-pagamento">Pix e cartoes sao pagos no ambiente seguro do Mercado Pago.</div></div>
     <div class="col-12 d-none" id="dados-dinheiro"><label class="form-label" for="valor-recebido">Vai pagar com quanto?</label><div class="input-group"><span class="input-group-text">R$</span><input class="form-control" id="valor-recebido" name="valor_recebido" inputmode="decimal" placeholder="Ex.: 50,00"><span class="input-group-text">para calcular o troco</span></div><div class="form-text">O entregador recebera esta informacao para levar o troco correto.</div></div>
     <div class="col-12"><button class="btn btn-success w-100" id="botao-finalizar">Ir para pagamento seguro</button></div>
   </form>
 </div></div></div>
-<aside class="col-lg-5"><div class="card summary-card"><div class="card-body"><h2 class="h5 summary-title mb-4">Resumo</h2>{% for item in itens %}<div class="d-flex justify-content-between gap-3 small mb-3"><span>{{ item.quantidade }} &times; {{ item.produto.descricao }}</span><strong class="text-nowrap">R$ {{ '%.2f'|format(item.subtotal) }}</strong></div>{% endfor %}<div class="d-flex justify-content-between small mb-3" id="linha-entrega"><span>Taxa de entrega</span><strong>R$ {{ '%.2f'|format(estabelecimento.valor_entrega) }}</strong></div><div class="d-flex justify-content-between summary-total"><span>Total</span><span id="total-pedido">R$ {{ '%.2f'|format(total) }}</span></div></div></div></aside></div>
+<aside class="col-lg-5"><div class="card summary-card"><div class="card-body"><h2 class="h5 summary-title mb-4">Resumo</h2>{% for item in itens %}<div class="d-flex justify-content-between gap-3 small mb-3"><span>{{ item.quantidade }} &times; {{ item.produto.descricao }}</span><strong class="text-nowrap">R$ {{ '%.2f'|format(item.subtotal) }}</strong></div>{% endfor %}<div class="d-flex justify-content-between small mb-3" id="linha-entrega"><span>Taxa de entrega</span><strong id="valor-entrega">Selecione o local</strong></div><p class="small text-muted" id="resumo-local">A retirada na loja remove a taxa.</p><div class="d-flex justify-content-between summary-total"><span>Total</span><span id="total-pedido">R$ {{ '%.2f'|format(total) }}</span></div></div></div></aside></div>
 <script>
   (() => {
     const radios = document.querySelectorAll('input[name="modalidade_entrega"]');
-    const dadosEntrega = document.getElementById('dados-entrega');
-    const local = dadosEntrega.querySelector('[name="local_entrega"]');
-    const endereco = dadosEntrega.querySelector('[name="endereco"]');
-    const linhaEntrega = document.getElementById('linha-entrega');
-    const total = document.getElementById('total-pedido');
-    const formaPagamento = document.getElementById('forma-pagamento');
-    const dadosDinheiro = document.getElementById('dados-dinheiro');
-    const valorRecebido = document.getElementById('valor-recebido');
-    const ajudaPagamento = document.getElementById('ajuda-pagamento');
-    const botaoFinalizar = document.getElementById('botao-finalizar');
-    const subtotal = Number({{ subtotal|tojson }});
-    const taxa = Number({{ estabelecimento.valor_entrega|tojson }});
-    const formatar = (valor) => `R$ ${valor.toFixed(2).replace('.', ',')}`;
-    function atualizarPagamento() {
-      const dinheiro = formaPagamento.value === 'DINHEIRO';
-      dadosDinheiro.classList.toggle('d-none', !dinheiro);
-      valorRecebido.required = dinheiro;
-      ajudaPagamento.textContent = dinheiro
-        ? 'Informe o valor entregue ao entregador para que o troco seja preparado.'
-        : 'Pix e cartoes sao pagos no ambiente seguro do Mercado Pago.';
-      botaoFinalizar.textContent = dinheiro ? 'Confirmar pedido em dinheiro' : 'Ir para pagamento seguro';
-    }
-    function atualizarModalidade() {
-      const retirada = document.querySelector('input[name="modalidade_entrega"]:checked').value === 'RETIRADA';
-      dadosEntrega.classList.toggle('d-none', retirada);
-      local.disabled = retirada; local.required = !retirada;
-      endereco.disabled = retirada; endereco.required = !retirada;
-      linhaEntrega.classList.toggle('d-none', retirada);
-      total.textContent = formatar(subtotal + (retirada ? 0 : taxa));
-      if (retirada && formaPagamento.value === 'DINHEIRO') formaPagamento.value = 'PIX';
-      atualizarPagamento();
-    }
-    radios.forEach((radio) => radio.addEventListener('change', atualizarModalidade));
-    formaPagamento.addEventListener('change', atualizarPagamento);
+    const dadosEntrega = document.getElementById('dados-entrega'); const local = dadosEntrega.querySelector('[name="local_entrega"]'); const endereco = dadosEntrega.querySelector('[name="endereco"]');
+    const linhaEntrega = document.getElementById('linha-entrega'); const total = document.getElementById('total-pedido'); const valorEntrega = document.getElementById('valor-entrega'); const resumoLocal = document.getElementById('resumo-local');
+    const formaPagamento = document.getElementById('forma-pagamento'); const dadosDinheiro = document.getElementById('dados-dinheiro'); const valorRecebido = document.getElementById('valor-recebido'); const ajudaPagamento = document.getElementById('ajuda-pagamento'); const botaoFinalizar = document.getElementById('botao-finalizar');
+    const subtotal = Number({{ subtotal|tojson }}); const formatar = (valor) => `R$ ${valor.toFixed(2).replace('.', ',')}`;
+    function dadosLocal() { const opcao = local.options[local.selectedIndex]; return opcao && opcao.dataset.taxa ? { taxa: Number(opcao.dataset.taxa), minimo: Number(opcao.dataset.minimo), prazo: Number(opcao.dataset.prazo) } : null; }
+    function atualizarPagamento() { const dinheiro = formaPagamento.value === 'DINHEIRO'; dadosDinheiro.classList.toggle('d-none', !dinheiro); valorRecebido.required = dinheiro; ajudaPagamento.textContent = dinheiro ? 'Informe o valor entregue ao entregador para que o troco seja preparado.' : 'Pix e cartoes sao pagos no ambiente seguro do Mercado Pago.'; botaoFinalizar.textContent = dinheiro ? 'Confirmar pedido em dinheiro' : 'Ir para pagamento seguro'; }
+    function atualizarModalidade() { const retirada = document.querySelector('input[name="modalidade_entrega"]:checked').value === 'RETIRADA'; const dados = dadosLocal(); dadosEntrega.classList.toggle('d-none', retirada); local.disabled = retirada; local.required = !retirada; endereco.disabled = retirada; endereco.required = !retirada; linhaEntrega.classList.toggle('d-none', retirada); if (retirada) { valorEntrega.textContent = 'R$ 0,00'; resumoLocal.textContent = 'Retirada na loja: sem taxa de entrega.'; total.textContent = formatar(subtotal); if (formaPagamento.value === 'DINHEIRO') formaPagamento.value = 'PIX'; } else if (dados) { valorEntrega.textContent = formatar(dados.taxa); resumoLocal.textContent = `Pedido minimo: ${formatar(dados.minimo)}. Previsao: cerca de ${dados.prazo} minutos.`; total.textContent = formatar(subtotal + dados.taxa); } else { valorEntrega.textContent = 'Selecione o local'; resumoLocal.textContent = 'A taxa, o minimo e o prazo dependem do local escolhido.'; total.textContent = formatar(subtotal); } atualizarPagamento(); }
+    radios.forEach((radio) => radio.addEventListener('change', atualizarModalidade)); local.addEventListener('change', atualizarModalidade); formaPagamento.addEventListener('change', atualizarPagamento);
+    const agendado = document.getElementById('agendado-para'); const agora = new Date(); agora.setMinutes(agora.getMinutes() + 15); agendado.min = agora.toISOString().slice(0, 16); const limite = new Date(); limite.setDate(limite.getDate() + 7); agendado.max = limite.toISOString().slice(0, 16);
     atualizarModalidade();
   })();
 </script>

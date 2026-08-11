@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block title %}Auditoria | Painel{% endblock %}
+{% block content %}
+<div class="page-heading"><h1>Auditoria do painel</h1><p>Ultimas acoes administrativas registradas. Senhas, tokens e dados de cartao nunca sao armazenados neste historico.</p></div>
+<div class="card shadow-sm"><div class="table-responsive"><table class="table table-hover align-middle mobile-cards"><thead><tr><th>Data</th><th>Usuario</th><th>Acao</th><th>Recurso</th><th>Detalhe</th></tr></thead><tbody>{% for registro in registros %}<tr><td data-label="Data">{{ registro.criado_em }}</td><td data-label="Usuario">{{ registro.usuario_nome }}</td><td data-label="Acao"><strong>{{ registro.acao }}</strong></td><td data-label="Recurso">{{ registro.recurso }}{% if registro.recurso_id %} #{{ registro.recurso_id }}{% endif %}</td><td data-label="Detalhe">{{ registro.detalhe or '-' }}</td></tr>{% else %}<tr><td colspan="5"><div class="empty-state">Nenhuma acao administrativa registrada ainda.</div></td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

@@ -1,5 +1,6 @@
 from decimal import Decimal, InvalidOperation
 import sqlite3
+from urllib.parse import urlparse
 
 from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
 
@@ -10,6 +11,7 @@ from models import (
     listar_complementos_produto,
     listar_produtos,
     obter_produto,
+    registrar_auditoria,
     substituir_complementos_produto,
 )
 from routes.auth import permission_required
@@ -24,9 +26,16 @@ def dados_produto_do_formulario():
     valor_unitario = float(Decimal(request.form["valor_unitario"].replace(",", ".")))
     estoque = int(request.form["estoque"])
     disponivel = request.form.get("disponivel") == "on"
-    if not codigo_interno or not descricao or (ean and not ean.isdigit()) or valor_unitario <= 0 or estoque < 0:
+    categoria = " ".join(request.form.get("categoria", "Geral").split()) or "Geral"
+    imagem_url = request.form.get("imagem_url", "").strip()
+    url = urlparse(imagem_url) if imagem_url else None
+    if (
+        not codigo_interno or not descricao or (ean and not ean.isdigit())
+        or valor_unitario <= 0 or estoque < 0 or not 1 <= len(categoria) <= 60
+        or (imagem_url and (url.scheme != "https" or not url.netloc or len(imagem_url) > 500))
+    ):
         raise ValueError
-    return codigo_interno, ean, descricao, valor_unitario, estoque, disponivel
+    return codigo_interno, ean, descricao, valor_unitario, estoque, disponivel, categoria, imagem_url
 
 
 def dados_complementos_do_formulario():
@@ -70,6 +79,7 @@ def novo():
         complementos = dados_complementos_do_formulario()
         produto_id = criar_produto(*dados_produto_do_formulario(), g.usuario["estabelecimento_id"])
         substituir_complementos_produto(produto_id, complementos)
+        registrar_auditoria(g.usuario["estabelecimento_id"], g.usuario, "Cadastrou produto", "PRODUTO", produto_id)
     except (KeyError, ValueError, InvalidOperation):
         flash("Confira os dados do produto e dos complementos.", "danger")
         return render_template("produto.html", produto=None, complementos=[]), 400
@@ -92,6 +102,7 @@ def editar(produto_id):
         complementos = dados_complementos_do_formulario()
         atualizar_produto(produto_id, *dados_produto_do_formulario(), g.usuario["estabelecimento_id"])
         substituir_complementos_produto(produto_id, complementos)
+        registrar_auditoria(g.usuario["estabelecimento_id"], g.usuario, "Atualizou produto", "PRODUTO", produto_id)
     except (KeyError, ValueError, InvalidOperation):
         flash("Confira os dados do produto e dos complementos.", "danger")
         return render_template("produto.html", produto=produto, complementos=listar_complementos_produto(produto_id, somente_ativos=False)), 400
