@@ -187,10 +187,36 @@ body.app-body {
 .pos-submit { display: flex; width: 100%; min-height: 54px; align-items: center; justify-content: space-between; border: 0; color: #fff; background: #0da56f; box-shadow: 0 10px 20px rgba(0, 0, 0, .19); }
 .pos-submit:hover, .pos-submit:focus { color: #fff; background: #07855a; }
 .pos-submit > span:last-child { font-size: 1.35rem; line-height: 1; }
+.pos-charge-submit { display: flex; width: 100%; min-height: 48px; align-items: center; justify-content: space-between; margin-top: 10px; border: 1px solid rgba(255,255,255,.42); color: #fff; background: transparent; box-shadow: none; }
+.pos-charge-submit:hover, .pos-charge-submit:focus { color: #fff; border-color: #fff; background: rgba(255,255,255,.12); }
 .pos-cancel-link { display: block; margin-top: 14px; color: #d6dcf5; font-size: .78rem; font-weight: 700; text-align: center; text-decoration: none; }
 .pos-cancel-link:hover { color: #fff; text-decoration: underline; }
 .pos-shortcuts { margin: 19px 0 0; color: #b8c1ed; font-size: .66rem; text-align: center; }
 .pos-shortcuts kbd { margin: 0 3px; padding: .14rem .26rem; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; color: #eef1ff; background: rgba(255,255,255,.1); font-size: .62rem; }
+
+/* Comanda / ticket aberto ------------------------------------------------ */
+.comanda-layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(310px, .78fr); gap: 22px; align-items: start; }
+.comanda-add-controls { display: grid; grid-template-columns: 120px 1fr auto; align-items: end; gap: 12px; margin-top: 16px; }
+.comanda-add-controls .btn { min-height: 44px; white-space: nowrap; }
+.comanda-item-price { display: flex; min-height: 44px; flex-direction: column; justify-content: center; padding: 0 .85rem; border: 1px solid #dbe3ef; border-radius: 10px; background: #f8fafc; }
+.comanda-item-price span { color: var(--muted); font-size: .72rem; font-weight: 700; }
+.comanda-item-price strong { margin-top: 2px; color: var(--ink); font-size: .97rem; }
+.comanda-items-list { border: 1px solid #e5eaf1; border-radius: 14px; overflow: hidden; }
+.comanda-item-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: .92rem 1rem; }
+.comanda-item-row + .comanda-item-row { border-top: 1px solid #e9edf3; }
+.comanda-item-main strong, .comanda-item-main small { display: block; }
+.comanda-item-main strong { color: var(--ink); font-size: .92rem; }
+.comanda-item-main small { margin-top: 3px; color: var(--muted); font-size: .78rem; }
+.comanda-item-total { display: flex; align-items: center; gap: 11px; text-align: right; }
+.comanda-item-total > strong { color: var(--ink); font-size: .9rem; white-space: nowrap; }
+.comanda-item-total form { margin: 0; }
+.comanda-summary-client { display: flex; flex-direction: column; gap: 4px; min-height: 58px; margin-bottom: 17px; padding: .7rem .8rem; border: 1px solid rgba(255,255,255,.14); border-radius: 11px; background: rgba(10,15,62,.24); }
+.comanda-summary-client span { color: #b9c2ff; font-size: .67rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.comanda-summary-client strong { overflow: hidden; color: #fff; text-overflow: ellipsis; white-space: nowrap; }
+.comanda-summary-card .pos-total-row { margin-top: 0; }
+.pos-payment-grid-compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pos-payment-grid-compact .pos-payment-option { min-height: 48px; padding: .45rem; font-size: .75rem; }
+.comanda-payment-help { min-height: 34px; margin: 12px 0 0; color: #c8d0f4; font-size: .74rem; }
 
 @media (max-width: 767.98px) {
   .app-header { position: static; padding: 10px 0; }
@@ -245,6 +271,7 @@ body.app-body {
   .pos-header-actions { width: 100%; }
   .pos-header-actions .btn { flex: 1; }
   .pos-layout { grid-template-columns: 1fr; gap: 16px; }
+  .comanda-layout { grid-template-columns: 1fr; gap: 16px; }
   .pos-main-card .card-body { padding: 1.1rem; }
   .pos-section-divider { margin: 21px 0; }
   .pos-payment-grid { gap: 7px; }
@@ -253,4 +280,8 @@ body.app-body {
   .pos-summary-card { position: static; }
   .pos-summary-card .card-body { padding: 1.15rem; }
   .pos-total-row strong { font-size: 1.6rem; }
+  .comanda-add-controls { grid-template-columns: 1fr 1fr; }
+  .comanda-add-controls .btn { grid-column: 1 / -1; width: 100%; }
+  .comanda-item-row { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .comanda-item-total { width: 100%; justify-content: space-between; }
 }

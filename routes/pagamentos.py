@@ -15,6 +15,7 @@ from models import (
     atualizar_preferencia,
     atualizar_preferencia_pedido,
     itens_pedido,
+    listar_itens_venda,
     obter_token_mercadopago,
     obter_url_publica_estabelecimento,
     obter_pedido,
@@ -287,11 +288,34 @@ def criar_checkout(venda_id):
     venda = obter_venda(venda_id, g.usuario["estabelecimento_id"])
     if venda is None:
         return "Venda nao encontrada", 404
+    itens = listar_itens_venda(venda_id)
+    if itens and venda["status_venda"] != "AGUARDANDO_PAGAMENTO":
+        flash("Finalize o ticket antes de abrir o pagamento.", "warning")
+        return redirect(url_for("vendas.comanda", venda_id=venda_id))
     if venda["valor_total"] <= 0:
         flash("O total da venda deve ser maior que R$ 0,00 para abrir o checkout.", "danger")
         return redirect(url_for("vendas.sucesso", venda_id=venda_id))
+    if itens and not float(venda["desconto"] or 0):
+        itens_preferencia = [
+            {
+                "title": item["descricao"],
+                "quantity": item["quantidade"],
+                "unit_price": float(item["valor_unitario"]),
+                "currency_id": "BRL",
+            }
+            for item in itens
+        ]
+    else:
+        # O Checkout Pro nao aceita desconto negativo por item. Quando houver
+        # desconto, enviamos a comanda como uma unica linha com o total final.
+        itens_preferencia = [{
+            "title": f"Comanda #{venda['id']} - {venda['cliente']}" if itens else venda["produto"],
+            "quantity": 1,
+            "unit_price": float(venda["valor_total"]),
+            "currency_id": "BRL",
+        }]
     preference = {
-        "items": [{"title": venda["produto"], "quantity": venda["quantidade"], "unit_price": float(venda["valor_total"] / venda["quantidade"]), "currency_id": "BRL"}],
+        "items": itens_preferencia,
         "external_reference": str(venda["id"]),
     }
     if venda["forma_pagamento"] in {"PIX", "CREDITO", "DEBITO"}:
@@ -321,6 +345,9 @@ def criar_cobranca_point(venda_id):
         return "Venda nao encontrada", 404
     if venda["forma_pagamento"] != "POINT":
         return "Forma de pagamento invalida para o Point", 400
+    if listar_itens_venda(venda_id) and venda["status_venda"] != "AGUARDANDO_PAGAMENTO":
+        flash("Finalize o ticket antes de enviar a cobranca ao Point.", "warning")
+        return redirect(url_for("vendas.comanda", venda_id=venda_id))
     if venda["valor_total"] <= 0:
         flash("O total da venda deve ser maior que R$ 0,00 para cobrar no Point.", "danger")
         return redirect(url_for("vendas.sucesso", venda_id=venda_id))

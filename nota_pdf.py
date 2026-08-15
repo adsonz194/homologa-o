@@ -35,12 +35,12 @@ def _altura_cupom(itens):
     return max(182 * mm, (148 + 9 * len(itens) + 3.8 * linhas_itens) * mm)
 
 
-def _altura_cupom_venda(venda):
+def _altura_cupom_venda(venda, itens):
     """Evita uma sobra grande de papel sem cortar textos longos do balcão."""
-    linhas_produto = max(1, (len(str(venda["produto"] or "")) + 28) // 29)
+    linhas_produto = sum(max(1, (len(str(item["descricao"] or "")) + 28) // 29) for item in itens)
     linhas_atendimento = max(1, (len(str(venda["cliente"] or "")) + 48) // 49)
     linhas_point = 2 if venda["forma_pagamento"] == "POINT" else 1
-    return max(145 * mm, (129 + 4.2 * linhas_produto + 3.5 * linhas_atendimento + 3 * linhas_point) * mm)
+    return max(145 * mm, (129 + 8.5 * len(itens) + 4.2 * linhas_produto + 3.5 * linhas_atendimento + 3 * linhas_point) * mm)
 
 
 def _fundo_cupom(canvas, documento):
@@ -194,17 +194,22 @@ def gerar_comprovante_pedido_pdf(pedido, itens, estabelecimento):
     return arquivo.getvalue()
 
 
-def gerar_comprovante_venda_pdf(venda, estabelecimento):
+def gerar_comprovante_venda_pdf(venda, estabelecimento, itens=None):
     """Gera um cupom operacional de balcão no papel térmico de 80 mm.
 
     O PDF pode ser aberto no computador/celular e impresso pelo driver da
     Bematech, Elgin i9 ou outra impressora configurada para bobina de 80 mm.
     Não substitui documento fiscal.
     """
+    itens = list(itens or [{
+        "descricao": venda["produto"],
+        "quantidade": venda["quantidade"],
+        "valor_unitario": venda["valor_unitario"],
+    }])
     arquivo = BytesIO()
     documento = SimpleDocTemplate(
         arquivo,
-        pagesize=(LARGURA_CUPOM, _altura_cupom_venda(venda)),
+        pagesize=(LARGURA_CUPOM, _altura_cupom_venda(venda, itens)),
         leftMargin=MARGEM,
         rightMargin=MARGEM,
         topMargin=5 * mm,
@@ -263,11 +268,13 @@ def gerar_comprovante_venda_pdf(venda, estabelecimento):
         Paragraph("<b>DESCRICAO</b>", pequeno),
         Paragraph("<b>QTD x UN.</b>", centro_pequeno),
         Paragraph("<b>VALOR</b>", direita_pequeno),
-    ], [
-        Paragraph(texto(venda["produto"]), pequeno),
-        Paragraph(f"{venda['quantidade']} x<br/>{moeda(venda['valor_unitario'])}", centro_pequeno),
-        Paragraph(moeda(venda["quantidade"] * venda["valor_unitario"]), direita_pequeno),
     ]]
+    for item in itens:
+        linhas.append([
+            Paragraph(texto(item["descricao"]), pequeno),
+            Paragraph(f"{item['quantidade']} x<br/>{moeda(item['valor_unitario'])}", centro_pequeno),
+            Paragraph(moeda(item["quantidade"] * item["valor_unitario"]), direita_pequeno),
+        ])
     tabela_itens = Table(linhas, colWidths=[41 * mm, 13 * mm, 16 * mm], repeatRows=1)
     tabela_itens.setStyle(TableStyle([
         ("LINEBELOW", (0, 0), (-1, 0), 0.5, COR_LINHA),

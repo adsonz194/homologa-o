@@ -65,6 +65,8 @@ def init_db():
         desconto REAL NOT NULL DEFAULT 0 CHECK(desconto >= 0), valor_total REAL NOT NULL,
         forma_pagamento TEXT NOT NULL, status_pagamento TEXT NOT NULL DEFAULT 'PENDENTE',
         preference_id TEXT, payment_id TEXT, point_order_id TEXT,
+        status_venda TEXT NOT NULL DEFAULT 'FECHADA',
+        atualizado_em TEXT,
         criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
     db.execute("""CREATE TABLE IF NOT EXISTS produtos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,6 +86,17 @@ def init_db():
         ativo INTEGER NOT NULL DEFAULT 1,
         criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(produto_id) REFERENCES produtos(id) ON DELETE CASCADE
+    )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS venda_itens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        venda_id INTEGER NOT NULL,
+        produto_id INTEGER NOT NULL,
+        descricao TEXT NOT NULL,
+        quantidade INTEGER NOT NULL CHECK(quantidade > 0),
+        valor_unitario REAL NOT NULL CHECK(valor_unitario >= 0),
+        criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(venda_id) REFERENCES vendas(id) ON DELETE CASCADE,
+        FOREIGN KEY(produto_id) REFERENCES produtos(id)
     )""")
     db.execute("""CREATE TABLE IF NOT EXISTS usuarios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -283,6 +296,10 @@ def init_db():
         db.execute("ALTER TABLE vendas ADD COLUMN estabelecimento_id INTEGER")
     if "point_order_id" not in colunas_vendas:
         db.execute("ALTER TABLE vendas ADD COLUMN point_order_id TEXT")
+    if "status_venda" not in colunas_vendas:
+        db.execute("ALTER TABLE vendas ADD COLUMN status_venda TEXT NOT NULL DEFAULT 'FECHADA'")
+    if "atualizado_em" not in colunas_vendas:
+        db.execute("ALTER TABLE vendas ADD COLUMN atualizado_em TEXT")
     colunas_produtos = {coluna["name"] for coluna in db.execute("PRAGMA table_info(produtos)")}
     if "disponivel" not in colunas_produtos:
         db.execute("ALTER TABLE produtos ADD COLUMN disponivel INTEGER NOT NULL DEFAULT 1")
@@ -372,6 +389,8 @@ def init_db():
     db.execute("CREATE INDEX IF NOT EXISTS idx_produto_complementos_produto ON produto_complementos(produto_id, ativo)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_vendas_estabelecimento ON vendas(estabelecimento_id, id)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_vendas_point_order ON vendas(point_order_id)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_vendas_status_aberta ON vendas(estabelecimento_id, status_venda, id)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_venda_itens_venda ON venda_itens(venda_id, id)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_pedidos_estabelecimento ON pedidos(estabelecimento_id, id)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_usuarios_estabelecimento ON usuarios(estabelecimento_id, usuario)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_tentativas_login_ip_data ON tentativas_login(endereco_ip, criado_em)")

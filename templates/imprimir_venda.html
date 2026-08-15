@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cupom da venda #{{ venda.id }}</title>
+  <style>
+    @page { size: 80mm auto; margin: 3mm; }
+    * { box-sizing: border-box; }
+    body { width: 74mm; margin: 0 auto; color: #111; font: 12px/1.35 Arial, sans-serif; }
+    .center { text-align: center; } .muted { font-size: 10px; } .line { border-top: 1px dashed #111; margin: 8px 0; }
+    .heading { margin: 0; font-size: 15px; } .sale { display: flex; justify-content: space-between; gap: 8px; }
+    .items { width: 100%; border-collapse: collapse; } .items th { padding: 4px 0; font-size: 9px; text-align: left; border-bottom: 1px solid #111; } .items th:last-child, .items td:last-child { text-align: right; }
+    .items td { padding: 5px 0; vertical-align: top; border-bottom: 1px dotted #aaa; } .item-info small { display: block; color: #444; }
+    .total { display: flex; justify-content: space-between; margin: 5px 0; font-size: 13px; font-weight: bold; }
+    .actions { width: 74mm; margin: 16px auto; text-align: center; } button { padding: 9px 16px; border: 0; border-radius: 6px; color: #fff; background: #111827; font-weight: bold; cursor: pointer; }
+    @media print { .actions { display: none; } body { width: auto; } }
+  </style>
+</head>
+<body>
+  <section class="center"><h1 class="heading">{{ estabelecimento.nome if estabelecimento else 'AG Delivery' }}</h1>{% if estabelecimento and estabelecimento.razao_social %}<div class="muted">{{ estabelecimento.razao_social }}</div>{% endif %}{% if estabelecimento and estabelecimento.endereco %}<div class="muted">{{ estabelecimento.endereco }}</div>{% endif %}{% if estabelecimento and estabelecimento.telefone %}<div class="muted">Tel.: {{ estabelecimento.telefone }}</div>{% endif %}{% if estabelecimento and estabelecimento.cnpj %}<div class="muted">CNPJ: {{ estabelecimento.cnpj }}</div>{% endif %}</section>
+  <div class="line"></div>
+  <div class="sale"><strong>COMPROVANTE DE VENDA</strong><strong>Nº {{ '%06d'|format(venda.id) }}</strong></div>
+  <div class="muted">{{ venda.criado_em }} · Venda presencial</div>
+  <div class="line"></div>
+  <div><strong>ATENDIMENTO:</strong> {{ venda.cliente }}</div>
+  <div class="line"></div>
+  <table class="items"><thead><tr><th>DESCRIÇÃO</th><th>VALOR</th></tr></thead><tbody>{% for item in itens %}<tr><td class="item-info">{{ item.descricao }}<small>{{ item.quantidade }} × R$ {{ '%.2f'|format(item.valor_unitario) }}</small></td><td>R$ {{ '%.2f'|format(item.quantidade * item.valor_unitario) }}</td></tr>{% else %}<tr><td>{{ venda.produto }}</td><td>R$ {{ '%.2f'|format(venda.valor_total) }}</td></tr>{% endfor %}</tbody></table>
+  <div class="line"></div>
+  {% if venda.desconto %}<div class="sale"><span>Desconto</span><span>- R$ {{ '%.2f'|format(venda.desconto) }}</span></div>{% endif %}
+  <div class="total"><span>TOTAL</span><span>R$ {{ '%.2f'|format(venda.valor_total) }}</span></div>
+  <div><strong>PAGAMENTO:</strong> {{ 'CARTÃO - POINT' if venda.forma_pagamento == 'POINT' else venda.forma_pagamento }}</div>
+  <div><strong>STATUS:</strong> {{ venda.status_pagamento }}</div>
+  {% if venda.point_order_id %}<div class="muted">Ordem Point: {{ venda.point_order_id }}</div>{% endif %}
+  <div class="line"></div><div class="center muted">DOCUMENTO OPERACIONAL - NÃO POSSUI VALOR FISCAL<br>Obrigado e volte sempre!</div>
+  <div class="actions"><button type="button" onclick="window.print()">Imprimir cupom</button></div>
+  <script>window.addEventListener('load', () => window.setTimeout(() => window.print(), 250));</script>
+</body>
+</html>

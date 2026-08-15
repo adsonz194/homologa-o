@@ -5,8 +5,8 @@
   <header class="pos-header">
     <div>
       <span class="pos-kicker">CAIXA / VENDA PRESENCIAL</span>
-      <h1>Nova venda</h1>
-      <p>Registre a venda, envie ao Point ou abra o pagamento seguro.</p>
+      <h1>Abrir ticket</h1>
+      <p>Informe a mesa ou o cliente e adicione os itens. A conta permanece aberta até a cobrança.</p>
     </div>
     <div class="pos-header-actions">
       {% if usuario.papel == 'DONO' %}<a class="btn btn-outline-primary" href="{{ url_for('produtos.novo') }}">+ Produto</a>{% endif %}
@@ -19,14 +19,10 @@
       <div class="card-body">
         <div class="pos-section-heading">
           <span class="pos-step">1</span>
-          <div><h2>Atendimento</h2><p>Identifique a mesa ou o cliente.</p></div>
+          <div><h2>Atendimento</h2><p>Use a mesa ou o nome como identificador do ticket.</p></div>
         </div>
-        <div class="row g-3">
-          <div class="col-12">
-            <label class="form-label" for="cliente">Cliente ou número da mesa</label>
-            <input class="form-control pos-large-input" id="cliente" name="cliente" maxlength="120" placeholder="Ex.: Mesa 12 ou Maria Silva" autocomplete="off" required autofocus>
-          </div>
-        </div>
+        <label class="form-label" for="cliente">Mesa ou cliente</label>
+        <input class="form-control pos-large-input" id="cliente" name="cliente" maxlength="120" placeholder="Ex.: Mesa 12 ou Maria Silva" autocomplete="off" required autofocus>
 
         <div class="pos-section-divider"></div>
         <div class="pos-section-heading">
@@ -47,7 +43,7 @@
         <div class="pos-section-divider"></div>
         <div class="pos-section-heading">
           <span class="pos-step">3</span>
-          <div><h2>Pagamento</h2><p>Escolha como o cliente irá pagar.</p></div>
+          <div><h2>Pagamento ao fechar</h2><p>Escolha a forma somente se for adicionar este item e cobrar agora.</p></div>
         </div>
         <div class="pos-payment-grid" role="radiogroup" aria-label="Forma de pagamento">
           <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-pix" value="PIX" checked>
@@ -59,18 +55,17 @@
           <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-point" value="POINT">
           <label class="pos-payment-option" for="pagamento-point"><span class="pos-payment-icon">▰</span><span>Point</span></label>
         </div>
-        <p class="form-text mb-0" id="ajuda-pagamento">O pagamento será concluído no ambiente seguro do Mercado Pago.</p>
+        <p class="form-text mb-0" id="ajuda-pagamento">O ticket continuará aberto se você apenas adicionar o item.</p>
       </div>
     </section>
 
     <aside class="card pos-summary-card">
       <div class="card-body">
-        <div class="pos-summary-heading"><div><span>RESUMO DA VENDA</span><h2>Venda atual</h2></div><span class="pos-live-dot">● Aberto</span></div>
-        <div class="pos-product-preview" id="produto-preview">
+        <div class="pos-summary-heading"><div><span>NOVO ITEM</span><h2>Ticket em aberto</h2></div><span class="pos-live-dot">● Aberto</span></div>
+        <div class="pos-product-preview">
           <span class="pos-product-preview-icon">⌕</span>
           <div><strong id="resumo-produto">Aguardando produto</strong><small id="resumo-codigo">Busque ou leia um código</small></div>
         </div>
-
         <div class="pos-adjustments">
           <div>
             <label class="form-label" for="quantidade">Quantidade</label>
@@ -78,17 +73,17 @@
           </div>
           <div>
             <label class="form-label" for="valor-unitario">Valor unitário</label>
-            <div class="input-group"><span class="input-group-text">R$</span><input class="form-control" id="valor-unitario" type="number" min="0" step="0.01" readonly required></div>
+            <div class="input-group"><span class="input-group-text">R$</span><input class="form-control" id="valor-unitario" type="number" min="0" step="0.01" readonly></div>
           </div>
           <div>
-            <label class="form-label" for="desconto">Desconto</label>
+            <label class="form-label" for="desconto">Desconto ao cobrar</label>
             <div class="input-group"><span class="input-group-text">R$</span><input class="form-control" id="desconto" name="desconto" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div>
           </div>
         </div>
-
-        <div class="pos-total-row"><span>Total a cobrar</span><strong id="total-venda">R$ 0,00</strong></div>
-        <button class="btn btn-success pos-submit" id="botao-venda" type="submit"><span>Finalizar e abrir checkout</span><span aria-hidden="true">→</span></button>
-        <a class="pos-cancel-link" href="{{ url_for('vendas.index') }}">Cancelar venda</a>
+        <div class="pos-total-row"><span>Valor deste item</span><strong id="total-venda">R$ 0,00</strong></div>
+        <button class="btn btn-success pos-submit" name="acao" value="ADICIONAR" type="submit"><span>Adicionar ao ticket</span><span aria-hidden="true">+</span></button>
+        <button class="btn pos-charge-submit" name="acao" value="COBRAR" type="submit"><span id="texto-cobrar">Adicionar e cobrar agora</span><span aria-hidden="true">→</span></button>
+        <a class="pos-cancel-link" href="{{ url_for('vendas.index') }}">Cancelar</a>
         <p class="pos-shortcuts"><kbd>F2</kbd> produto <kbd>F4</kbd> quantidade</p>
       </div>
     </aside>
@@ -106,74 +101,47 @@
   const resumoCodigo = document.getElementById('resumo-codigo');
   const totalVenda = document.getElementById('total-venda');
   let temporizador, controlador;
-
-  function valorNumero(campo) { return Number(String(campo.value || '0').replace(',', '.')) || 0; }
-  function moeda(valor) { return valor.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}); }
-  function atualizarResumo() {
-    const total = Math.max(0, valorNumero(valor) * Math.max(0, valorNumero(quantidade)) - valorNumero(desconto));
-    totalVenda.textContent = moeda(total);
-  }
+  const numero = campo => Number(String(campo.value || '0').replace(',', '.')) || 0;
+  const moeda = valor => valor.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+  function atualizarResumo() { totalVenda.textContent = moeda(Math.max(0, numero(valor) * Math.max(0, numero(quantidade)))); }
   function limparResultados() { resultados.replaceChildren(); }
   function selecionar(produto) {
-    produtoId.value = produto.id;
-    busca.value = produto.descricao;
-    valor.value = Number(produto.valor_unitario).toFixed(2);
+    produtoId.value = produto.id; busca.value = produto.descricao; valor.value = Number(produto.valor_unitario).toFixed(2);
     selecionado.textContent = `Selecionado: ${produto.descricao} | Interno: ${produto.codigo_interno}${produto.ean ? ' | EAN: ' + produto.ean : ''}`;
-    resumoProduto.textContent = produto.descricao;
-    resumoCodigo.textContent = `Código ${produto.codigo_interno}${produto.ean ? ' · EAN ' + produto.ean : ''}`;
-    limparResultados();
-    atualizarResumo();
-    quantidade.focus();
+    resumoProduto.textContent = produto.descricao; resumoCodigo.textContent = `Código ${produto.codigo_interno}${produto.ean ? ' · EAN ' + produto.ean : ''}`;
+    limparResultados(); atualizarResumo(); quantidade.focus();
   }
   function mostrarResultados(itens) {
     limparResultados();
     for (const produto of itens) {
-      const item = document.createElement('button');
-      item.type = 'button'; item.className = 'list-group-item list-group-item-action pos-product-result';
-      const detalhe = `Interno: ${produto.codigo_interno}${produto.ean ? ' | EAN: ' + produto.ean : ''} | R$ ${Number(produto.valor_unitario).toFixed(2)}`;
-      item.innerHTML = '<strong></strong><small></small>';
-      item.querySelector('strong').textContent = produto.descricao;
-      item.querySelector('small').textContent = detalhe;
-      item.addEventListener('click', () => selecionar(produto));
-      resultados.appendChild(item);
+      const item = document.createElement('button'); item.type = 'button'; item.className = 'list-group-item list-group-item-action pos-product-result';
+      item.innerHTML = '<strong></strong><small></small>'; item.querySelector('strong').textContent = produto.descricao;
+      item.querySelector('small').textContent = `Interno: ${produto.codigo_interno}${produto.ean ? ' | EAN: ' + produto.ean : ''} | R$ ${Number(produto.valor_unitario).toFixed(2)}`;
+      item.addEventListener('click', () => selecionar(produto)); resultados.appendChild(item);
     }
   }
   busca.addEventListener('input', () => {
     produtoId.value = ''; valor.value = ''; resumoProduto.textContent = 'Aguardando produto'; resumoCodigo.textContent = 'Busque ou leia um código';
-    selecionado.textContent = 'Escolha um produto cadastrado na lista.';
-    atualizarResumo(); clearTimeout(temporizador); limparResultados();
-    const consulta = busca.value.trim();
-    if (!consulta) return;
+    selecionado.textContent = 'Escolha um produto cadastrado na lista.'; atualizarResumo(); clearTimeout(temporizador); limparResultados();
+    const consulta = busca.value.trim(); if (!consulta) return;
     temporizador = setTimeout(async () => {
-      if (controlador) controlador.abort();
-      controlador = new AbortController();
+      if (controlador) controlador.abort(); controlador = new AbortController();
       try {
-        const resposta = await fetch(`/api/produtos/buscar?q=${encodeURIComponent(consulta)}`, {signal: controlador.signal});
-        const itens = await resposta.json();
+        const resposta = await fetch(`/api/produtos/buscar?q=${encodeURIComponent(consulta)}`, {signal: controlador.signal}); const itens = await resposta.json();
         const exato = itens.find(p => p.ean === consulta || p.codigo_interno.toLowerCase() === consulta.toLowerCase());
         if (exato) selecionar(exato); else mostrarResultados(itens);
       } catch (erro) { if (erro.name !== 'AbortError') selecionado.textContent = 'Não foi possível pesquisar os produtos.'; }
     }, 180);
   });
   [quantidade, desconto].forEach(campo => campo.addEventListener('input', atualizarResumo));
-  document.getElementById('form-venda').addEventListener('submit', (evento) => {
-    if (!produtoId.value) { evento.preventDefault(); busca.focus(); selecionado.textContent = 'Selecione um produto do cadastro antes de vender.'; }
-  });
-  const formasPagamento = document.querySelectorAll('input[name="forma_pagamento"]');
-  const ajudaPagamento = document.getElementById('ajuda-pagamento');
-  const botaoVenda = document.getElementById('botao-venda');
-  function atualizarFormaPagamento() {
-    const forma = document.querySelector('input[name="forma_pagamento"]:checked').value;
-    const point = forma === 'POINT';
-    ajudaPagamento.textContent = point ? 'A cobrança aparecerá na maquininha Point configurada pela loja.' : 'O pagamento será concluído no ambiente seguro do Mercado Pago.';
-    botaoVenda.querySelector('span').textContent = point ? 'Finalizar e enviar ao Point' : 'Finalizar e abrir checkout';
-  }
-  formasPagamento.forEach(campo => campo.addEventListener('change', atualizarFormaPagamento));
-  window.addEventListener('keydown', (evento) => {
-    if (evento.key === 'F2') { evento.preventDefault(); busca.focus(); }
-    if (evento.key === 'F4') { evento.preventDefault(); quantidade.focus(); quantidade.select(); }
-  });
+  document.getElementById('form-venda').addEventListener('submit', evento => { if (!produtoId.value) { evento.preventDefault(); busca.focus(); selecionado.textContent = 'Selecione um produto do cadastro antes de continuar.'; } });
+  const ajudaPagamento = document.getElementById('ajuda-pagamento'); const textoCobrar = document.getElementById('texto-cobrar');
+  document.querySelectorAll('input[name="forma_pagamento"]').forEach(campo => campo.addEventListener('change', () => {
+    const point = document.querySelector('input[name="forma_pagamento"]:checked').value === 'POINT';
+    ajudaPagamento.textContent = point ? 'Ao cobrar agora, a cobrança será enviada à maquininha Point.' : 'Ao cobrar agora, o checkout seguro do Mercado Pago será aberto.';
+    textoCobrar.textContent = point ? 'Adicionar e enviar ao Point' : 'Adicionar e cobrar agora';
+  }));
+  window.addEventListener('keydown', evento => { if (evento.key === 'F2') { evento.preventDefault(); busca.focus(); } if (evento.key === 'F4') { evento.preventDefault(); quantidade.focus(); quantidade.select(); } });
   atualizarResumo();
-  atualizarFormaPagamento();
 </script>
 {% endblock %}

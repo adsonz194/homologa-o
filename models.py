@@ -442,6 +442,148 @@ def criar_venda(cliente, produto, quantidade, valor_unitario, desconto, forma_pa
     return cursor.lastrowid
 
 
+def criar_comanda(cliente, estabelecimento_id):
+    """Abre uma comanda sem baixar estoque até o pagamento ser aprovado."""
+    db = get_db()
+    cursor = db.execute(
+        """INSERT INTO vendas
+           (cliente, produto, quantidade, valor_unitario, desconto, valor_total,
+            forma_pagamento, canal_venda, estabelecimento_id, status_venda, atualizado_em)
+           VALUES (?, 'Comanda aberta', 1, 0, 0, 0, 'A DEFINIR', 'INTERNA', ?, 'ABERTA', CURRENT_TIMESTAMP)""",
+        (cliente, estabelecimento_id),
+    )
+    db.commit()
+    return cursor.lastrowid
+
+
+def obter_comanda_aberta(cliente, estabelecimento_id):
+    return get_db().execute(
+        """SELECT * FROM vendas
+           WHERE estabelecimento_id = ? AND status_venda = 'ABERTA'
+             AND cliente = ? COLLATE NOCASE
+           ORDER BY id DESC LIMIT 1""",
+        (estabelecimento_id, cliente),
+    ).fetchone()
+
+
+def listar_itens_venda(venda_id):
+    return get_db().execute(
+        """SELECT venda_itens.*, produtos.codigo_interno, produtos.ean
+           FROM venda_itens
+           LEFT JOIN produtos ON produtos.id = venda_itens.produto_id
+           WHERE venda_itens.venda_id = ?
+           ORDER BY venda_itens.id""",
+        (venda_id,),
+    ).fetchall()
+
+
+def _recalcular_comanda(venda_id):
+    db = get_db()
+    venda = obter_venda(venda_id)
+    if venda is None:
+        return None
+    itens = listar_itens_venda(venda_id)
+    quantidade_total = sum(item["quantidade"] for item in itens)
+    subtotal = sum(item["quantidade"] * item["valor_unitario"] for item in itens)
+    desconto = min(float(venda["desconto"] or 0), subtotal)
+    if not itens:
+        resumo = "Comanda aberta"
+    elif len(itens) == 1:
+        resumo = itens[0]["descricao"]
+    else:
+        resumo = f"{len(itens)} itens na comanda"
+    db.execute(
+        """UPDATE vendas
+           SET produto = ?, quantidade = ?, valor_unitario = ?, desconto = ?,
+               valor_total = ?, atualizado_em = CURRENT_TIMESTAMP
+           WHERE id = ?""",
+        (
+            resumo,
+            max(1, quantidade_total),
+            (subtotal / quantidade_total) if quantidade_total else 0,
+            desconto,
+            max(0, subtotal - desconto),
+            venda_id,
+        ),
+    )
+    db.commit()
+    return obter_venda(venda_id)
+
+
+def adicionar_item_comanda(venda_id, produto_id, quantidade, estabelecimento_id):
+    db = get_db()
+    with db:
+        venda = obter_venda(venda_id, estabelecimento_id)
+        if venda is None or venda["status_venda"] != "ABERTA":
+            raise ValueError("Esta comanda nao esta aberta para novos itens.")
+        produto = db.execute(
+            """SELECT * FROM produtos
+               WHERE id = ? AND estabelecimento_id = ?""",
+            (produto_id, estabelecimento_id),
+        ).fetchone()
+        if produto is None or not produto["disponivel"]:
+            raise EstoqueInsuficiente("Produto indisponivel.")
+        quantidade_na_comanda = db.execute(
+            """SELECT COALESCE(SUM(quantidade), 0) AS total
+               FROM venda_itens WHERE venda_id = ? AND produto_id = ?""",
+            (venda_id, produto_id),
+        ).fetchone()["total"]
+        if quantidade <= 0 or quantidade_na_comanda + quantidade > produto["estoque"]:
+            raise EstoqueInsuficiente("Estoque insuficiente para adicionar esta quantidade na comanda.")
+        db.execute(
+            """INSERT INTO venda_itens
+               (venda_id, produto_id, descricao, quantidade, valor_unitario)
+               VALUES (?, ?, ?, ?, ?)""",
+            (venda_id, produto_id, produto["descricao"], quantidade, produto["valor_unitario"]),
+        )
+    return _recalcular_comanda(venda_id)
+
+
+def remover_item_comanda(venda_id, item_id, estabelecimento_id):
+    db = get_db()
+    with db:
+        venda = obter_venda(venda_id, estabelecimento_id)
+        if venda is None or venda["status_venda"] != "ABERTA":
+            return False
+        cursor = db.execute(
+            "DELETE FROM venda_itens WHERE id = ? AND venda_id = ?", (item_id, venda_id)
+        )
+        if cursor.rowcount != 1:
+            return False
+    _recalcular_comanda(venda_id)
+    return True
+
+
+def preparar_comanda_para_pagamento(venda_id, forma_pagamento, desconto, estabelecimento_id):
+    """Fecha a inclusao de itens e prepara a comanda para Checkout ou Point."""
+    db = get_db()
+    with db:
+        venda = obter_venda(venda_id, estabelecimento_id)
+        if venda is None or venda["status_venda"] != "ABERTA":
+            raise ValueError("Esta comanda nao esta aberta para pagamento.")
+        itens = listar_itens_venda(venda_id)
+        subtotal = sum(item["quantidade"] * item["valor_unitario"] for item in itens)
+        if not itens or subtotal <= 0 or desconto < 0 or desconto >= subtotal:
+            raise ValueError("Adicione itens e informe um desconto menor que o subtotal.")
+        for item in itens:
+            produto = db.execute(
+                """SELECT disponivel, estoque FROM produtos
+                   WHERE id = ? AND estabelecimento_id = ?""",
+                (item["produto_id"], estabelecimento_id),
+            ).fetchone()
+            if produto is None or not produto["disponivel"] or produto["estoque"] < item["quantidade"]:
+                raise EstoqueInsuficiente(f"Estoque insuficiente para {item['descricao']}.")
+        db.execute(
+            """UPDATE vendas
+               SET desconto = ?, valor_total = ?, forma_pagamento = ?,
+                   status_pagamento = 'PENDENTE', status_venda = 'AGUARDANDO_PAGAMENTO',
+                   atualizado_em = CURRENT_TIMESTAMP
+               WHERE id = ?""",
+            (desconto, subtotal - desconto, forma_pagamento, venda_id),
+        )
+    return obter_venda(venda_id, estabelecimento_id)
+
+
 def obter_venda(venda_id, estabelecimento_id=None):
     consulta = "SELECT * FROM vendas WHERE id = ?"
     parametros = [venda_id]
@@ -477,7 +619,8 @@ def relatorio_vendas(estabelecimento_id, data_inicio, data_fim):
                   produto || ' × ' || quantidade AS descricao, forma_pagamento,
                   valor_total, status_pagamento, criado_em
            FROM vendas
-           WHERE estabelecimento_id = ? AND criado_em >= ? AND criado_em < ?
+           WHERE estabelecimento_id = ? AND status_venda <> 'ABERTA'
+             AND criado_em >= ? AND criado_em < ?
            UNION ALL
            SELECT 'DELIVERY' AS canal, pedidos.id, pedidos.cliente,
                   COALESCE(GROUP_CONCAT(pedido_itens.quantidade || ' × ' || pedido_itens.descricao, ', '), ''),
@@ -517,6 +660,10 @@ def atualizar_ordem_point_venda(venda_id, point_order_id, status="PENDENTE"):
         (point_order_id, status, venda_id),
     )
     db.commit()
+    # Em ambiente de teste o Point pode responder como processado na criacao
+    # da ordem. Nesse caso aplicamos a mesma baixa de estoque do webhook.
+    if status != "PENDENTE":
+        atualizar_pagamento(venda_id, status)
 
 
 def atualizar_pagamento(venda_id, status, payment_id=None):
@@ -525,12 +672,34 @@ def atualizar_pagamento(venda_id, status, payment_id=None):
         venda = obter_venda(venda_id)
         if venda is None:
             return
-        if status in {"REJEITADO", "CANCELADO"} and venda["estoque_reservado"] and venda["produto_id"]:
-            db.execute("UPDATE produtos SET estoque = estoque + ? WHERE id = ?", (venda["quantidade"], venda["produto_id"]))
+        itens_comanda = listar_itens_venda(venda_id)
+        if status == "APROVADO" and venda["status_venda"] == "AGUARDANDO_PAGAMENTO" and not venda["estoque_reservado"]:
+            for item in itens_comanda:
+                cursor = db.execute(
+                    """UPDATE produtos SET estoque = estoque - ?
+                       WHERE id = ? AND estabelecimento_id = ? AND disponivel = 1 AND estoque >= ?""",
+                    (item["quantidade"], item["produto_id"], venda["estabelecimento_id"], item["quantidade"]),
+                )
+                if cursor.rowcount != 1:
+                    raise EstoqueInsuficiente(f"Estoque insuficiente para {item['descricao']}.")
+            db.execute("UPDATE vendas SET estoque_reservado = 1 WHERE id = ?", (venda_id,))
+        if status in {"REJEITADO", "CANCELADO"} and venda["estoque_reservado"]:
+            if itens_comanda:
+                for item in itens_comanda:
+                    db.execute("UPDATE produtos SET estoque = estoque + ? WHERE id = ?", (item["quantidade"], item["produto_id"]))
+            elif venda["produto_id"]:
+                db.execute("UPDATE produtos SET estoque = estoque + ? WHERE id = ?", (venda["quantidade"], venda["produto_id"]))
             db.execute("UPDATE vendas SET estoque_reservado = 0 WHERE id = ?", (venda_id,))
+        status_venda = venda["status_venda"]
+        if status == "APROVADO" and status_venda == "AGUARDANDO_PAGAMENTO":
+            status_venda = "FECHADA"
+        elif status in {"REJEITADO", "CANCELADO"} and status_venda == "AGUARDANDO_PAGAMENTO" and venda["status_pagamento"] != "APROVADO":
+            status_venda = "ABERTA"
         db.execute(
-            "UPDATE vendas SET status_pagamento = ?, payment_id = COALESCE(?, payment_id) WHERE id = ?",
-            (status, payment_id, venda_id),
+            """UPDATE vendas SET status_pagamento = ?, status_venda = ?,
+               payment_id = COALESCE(?, payment_id), atualizado_em = CURRENT_TIMESTAMP
+               WHERE id = ?""",
+            (status, status_venda, payment_id, venda_id),
         )
 
 
