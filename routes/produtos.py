@@ -1,6 +1,7 @@
 from decimal import Decimal, InvalidOperation
+import re
 import sqlite3
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
 
@@ -17,6 +18,36 @@ from models import (
 from routes.auth import permission_required
 
 produtos_bp = Blueprint("produtos", __name__)
+HOSTS_GOOGLE_DRIVE = {"drive.google.com", "www.drive.google.com"}
+
+
+def normalizar_url_imagem(imagem_url):
+    """Transforma links publicos de arquivo do Drive em URL de miniatura.
+
+    O link de compartilhamento comum do Drive abre uma pagina HTML, nao uma
+    imagem. A URL /thumbnail e apropriada para ser usada diretamente na tag
+    img do cardapio, sem baixar o arquivo para o servidor da loja.
+    """
+    if not imagem_url:
+        return ""
+    url = urlparse(imagem_url)
+    if url.scheme != "https" or not url.netloc or len(imagem_url) > 500:
+        raise ValueError
+    if url.hostname.lower() not in HOSTS_GOOGLE_DRIVE:
+        return imagem_url
+
+    parametros = parse_qs(url.query)
+    correspondencia = re.search(r"/file/d/([A-Za-z0-9_-]+)", url.path)
+    arquivo_id = (correspondencia.group(1) if correspondencia else (parametros.get("id") or [""])[0])
+    if not re.fullmatch(r"[A-Za-z0-9_-]{10,200}", arquivo_id):
+        raise ValueError
+    consulta = {"id": arquivo_id, "sz": "w1200"}
+    # Alguns links recentes do Drive incluem resourcekey; preserva-o para que
+    # a imagem continue acessivel para quem recebeu o link publico.
+    resource_key = (parametros.get("resourcekey") or [""])[0]
+    if resource_key:
+        consulta["resourcekey"] = resource_key
+    return f"https://drive.google.com/thumbnail?{urlencode(consulta)}"
 
 
 def dados_produto_do_formulario():
@@ -27,12 +58,10 @@ def dados_produto_do_formulario():
     estoque = int(request.form["estoque"])
     disponivel = request.form.get("disponivel") == "on"
     categoria = " ".join(request.form.get("categoria", "Geral").split()) or "Geral"
-    imagem_url = request.form.get("imagem_url", "").strip()
-    url = urlparse(imagem_url) if imagem_url else None
+    imagem_url = normalizar_url_imagem(request.form.get("imagem_url", "").strip())
     if (
         not codigo_interno or not descricao or (ean and not ean.isdigit())
         or valor_unitario <= 0 or estoque < 0 or not 1 <= len(categoria) <= 60
-        or (imagem_url and (url.scheme != "https" or not url.netloc or len(imagem_url) > 500))
     ):
         raise ValueError
     return codigo_interno, ean, descricao, valor_unitario, estoque, disponivel, categoria, imagem_url
