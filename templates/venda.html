@@ -1,48 +1,137 @@
 {% extends 'base.html' %}
-{% block title %}Nova venda | Sistema de Vendas{% endblock %}
+{% block title %}PDV | AG Delivery{% endblock %}
 {% block content %}
-<div class="card shadow-sm"><div class="card-body p-4">
-  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4"><h1 class="h3 mb-0">Cadastrar venda</h1>{% if usuario.papel == 'DONO' %}<a class="btn btn-outline-primary btn-sm" href="{{ url_for('produtos.novo') }}">Cadastrar produto</a>{% endif %}</div>
-  <form method="post" class="row g-3" id="form-venda">
-    <div class="col-md-6"><label class="form-label">Cliente ou numero da mesa</label><input class="form-control" name="cliente" maxlength="120" placeholder="Ex.: Mesa 12 ou Maria Silva" required><div class="form-text">Informe a mesa para consumo no local ou o nome para retirada.</div></div>
-    <div class="col-md-6 position-relative">
-      <label class="form-label" for="busca-produto">Produto</label>
-      <input class="form-control" id="busca-produto" placeholder="EAN, codigo interno ou descricao" autocomplete="off" required>
-      <input type="hidden" name="produto_id" id="produto-id">
-      <div id="resultados-produto" class="list-group position-absolute w-100 shadow" style="z-index: 10;"></div>
-      <div class="form-text" id="produto-selecionado">Digite para pesquisar no cadastro de itens.</div>
+<section class="pos-page">
+  <header class="pos-header">
+    <div>
+      <span class="pos-kicker">CAIXA / VENDA PRESENCIAL</span>
+      <h1>Nova venda</h1>
+      <p>Registre a venda, envie ao Point ou abra o pagamento seguro.</p>
     </div>
-    <div class="col-md-4"><label class="form-label">Quantidade</label><input class="form-control" id="quantidade" name="quantidade" type="number" min="1" value="1" required></div>
-    <div class="col-md-4"><label class="form-label">Valor unitario (R$)</label><input class="form-control" id="valor-unitario" type="number" min="0" step="0.01" readonly required></div>
-    <div class="col-md-4"><label class="form-label">Desconto (R$)</label><input class="form-control" name="desconto" type="number" min="0" step="0.01" value="0"></div>
-    <div class="col-md-6"><label class="form-label">Forma de pagamento</label><select class="form-select" id="forma-pagamento" name="forma_pagamento" required><option value="PIX">Pix</option><option value="CREDITO">Cartao de credito</option><option value="DEBITO">Cartao de debito</option><option value="POINT">Cartao na maquininha Point</option></select><div class="form-text" id="ajuda-pagamento">O pagamento sera concluido no ambiente seguro do Mercado Pago.</div></div>
-    <div class="col-12 d-grid gap-2 d-sm-flex"><button class="btn btn-success" id="botao-venda">Vender e abrir checkout</button><a class="btn btn-outline-secondary" href="{{ url_for('vendas.index') }}">Cancelar</a></div>
+    <div class="pos-header-actions">
+      {% if usuario.papel == 'DONO' %}<a class="btn btn-outline-primary" href="{{ url_for('produtos.novo') }}">+ Produto</a>{% endif %}
+      <a class="btn btn-light border" href="{{ url_for('vendas.index') }}">Histórico</a>
+    </div>
+  </header>
+
+  <form method="post" id="form-venda" class="pos-layout" novalidate>
+    <section class="card pos-main-card">
+      <div class="card-body">
+        <div class="pos-section-heading">
+          <span class="pos-step">1</span>
+          <div><h2>Atendimento</h2><p>Identifique a mesa ou o cliente.</p></div>
+        </div>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label" for="cliente">Cliente ou número da mesa</label>
+            <input class="form-control pos-large-input" id="cliente" name="cliente" maxlength="120" placeholder="Ex.: Mesa 12 ou Maria Silva" autocomplete="off" required autofocus>
+          </div>
+        </div>
+
+        <div class="pos-section-divider"></div>
+        <div class="pos-section-heading">
+          <span class="pos-step">2</span>
+          <div><h2>Produto</h2><p>Busque por EAN, código interno ou descrição.</p></div>
+        </div>
+        <div class="position-relative pos-product-search">
+          <label class="visually-hidden" for="busca-produto">Buscar produto</label>
+          <div class="input-group input-group-lg">
+            <span class="input-group-text pos-search-icon" aria-hidden="true">⌕</span>
+            <input class="form-control" id="busca-produto" placeholder="Digite ou leia o código de barras" autocomplete="off" required>
+          </div>
+          <input type="hidden" name="produto_id" id="produto-id">
+          <div id="resultados-produto" class="list-group position-absolute w-100 shadow"></div>
+          <div class="form-text mt-2" id="produto-selecionado">Nenhum produto selecionado.</div>
+        </div>
+
+        <div class="pos-section-divider"></div>
+        <div class="pos-section-heading">
+          <span class="pos-step">3</span>
+          <div><h2>Pagamento</h2><p>Escolha como o cliente irá pagar.</p></div>
+        </div>
+        <div class="pos-payment-grid" role="radiogroup" aria-label="Forma de pagamento">
+          <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-pix" value="PIX" checked>
+          <label class="pos-payment-option" for="pagamento-pix"><span class="pos-payment-icon">◈</span><span>Pix</span></label>
+          <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-credito" value="CREDITO">
+          <label class="pos-payment-option" for="pagamento-credito"><span class="pos-payment-icon">▣</span><span>Crédito</span></label>
+          <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-debito" value="DEBITO">
+          <label class="pos-payment-option" for="pagamento-debito"><span class="pos-payment-icon">▤</span><span>Débito</span></label>
+          <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-point" value="POINT">
+          <label class="pos-payment-option" for="pagamento-point"><span class="pos-payment-icon">▰</span><span>Point</span></label>
+        </div>
+        <p class="form-text mb-0" id="ajuda-pagamento">O pagamento será concluído no ambiente seguro do Mercado Pago.</p>
+      </div>
+    </section>
+
+    <aside class="card pos-summary-card">
+      <div class="card-body">
+        <div class="pos-summary-heading"><div><span>RESUMO DA VENDA</span><h2>Venda atual</h2></div><span class="pos-live-dot">● Aberto</span></div>
+        <div class="pos-product-preview" id="produto-preview">
+          <span class="pos-product-preview-icon">⌕</span>
+          <div><strong id="resumo-produto">Aguardando produto</strong><small id="resumo-codigo">Busque ou leia um código</small></div>
+        </div>
+
+        <div class="pos-adjustments">
+          <div>
+            <label class="form-label" for="quantidade">Quantidade</label>
+            <input class="form-control pos-number-input" id="quantidade" name="quantidade" type="number" min="1" value="1" inputmode="numeric" required>
+          </div>
+          <div>
+            <label class="form-label" for="valor-unitario">Valor unitário</label>
+            <div class="input-group"><span class="input-group-text">R$</span><input class="form-control" id="valor-unitario" type="number" min="0" step="0.01" readonly required></div>
+          </div>
+          <div>
+            <label class="form-label" for="desconto">Desconto</label>
+            <div class="input-group"><span class="input-group-text">R$</span><input class="form-control" id="desconto" name="desconto" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div>
+          </div>
+        </div>
+
+        <div class="pos-total-row"><span>Total a cobrar</span><strong id="total-venda">R$ 0,00</strong></div>
+        <button class="btn btn-success pos-submit" id="botao-venda" type="submit"><span>Finalizar e abrir checkout</span><span aria-hidden="true">→</span></button>
+        <a class="pos-cancel-link" href="{{ url_for('vendas.index') }}">Cancelar venda</a>
+        <p class="pos-shortcuts"><kbd>F2</kbd> produto <kbd>F4</kbd> quantidade</p>
+      </div>
+    </aside>
   </form>
-</div></div>
+</section>
 <script>
   const busca = document.getElementById('busca-produto');
   const produtoId = document.getElementById('produto-id');
   const valor = document.getElementById('valor-unitario');
+  const quantidade = document.getElementById('quantidade');
+  const desconto = document.getElementById('desconto');
   const resultados = document.getElementById('resultados-produto');
   const selecionado = document.getElementById('produto-selecionado');
+  const resumoProduto = document.getElementById('resumo-produto');
+  const resumoCodigo = document.getElementById('resumo-codigo');
+  const totalVenda = document.getElementById('total-venda');
   let temporizador, controlador;
 
+  function valorNumero(campo) { return Number(String(campo.value || '0').replace(',', '.')) || 0; }
+  function moeda(valor) { return valor.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}); }
+  function atualizarResumo() {
+    const total = Math.max(0, valorNumero(valor) * Math.max(0, valorNumero(quantidade)) - valorNumero(desconto));
+    totalVenda.textContent = moeda(total);
+  }
   function limparResultados() { resultados.replaceChildren(); }
   function selecionar(produto) {
     produtoId.value = produto.id;
     busca.value = produto.descricao;
     valor.value = Number(produto.valor_unitario).toFixed(2);
     selecionado.textContent = `Selecionado: ${produto.descricao} | Interno: ${produto.codigo_interno}${produto.ean ? ' | EAN: ' + produto.ean : ''}`;
+    resumoProduto.textContent = produto.descricao;
+    resumoCodigo.textContent = `Código ${produto.codigo_interno}${produto.ean ? ' · EAN ' + produto.ean : ''}`;
     limparResultados();
-    document.getElementById('quantidade').focus();
+    atualizarResumo();
+    quantidade.focus();
   }
   function mostrarResultados(itens) {
     limparResultados();
     for (const produto of itens) {
       const item = document.createElement('button');
-      item.type = 'button'; item.className = 'list-group-item list-group-item-action';
+      item.type = 'button'; item.className = 'list-group-item list-group-item-action pos-product-result';
       const detalhe = `Interno: ${produto.codigo_interno}${produto.ean ? ' | EAN: ' + produto.ean : ''} | R$ ${Number(produto.valor_unitario).toFixed(2)}`;
-      item.innerHTML = `<strong></strong><small class="d-block text-muted"></small>`;
+      item.innerHTML = '<strong></strong><small></small>';
       item.querySelector('strong').textContent = produto.descricao;
       item.querySelector('small').textContent = detalhe;
       item.addEventListener('click', () => selecionar(produto));
@@ -50,8 +139,9 @@
     }
   }
   busca.addEventListener('input', () => {
-    produtoId.value = ''; valor.value = ''; selecionado.textContent = 'Escolha um produto cadastrado na lista.';
-    clearTimeout(temporizador); limparResultados();
+    produtoId.value = ''; valor.value = ''; resumoProduto.textContent = 'Aguardando produto'; resumoCodigo.textContent = 'Busque ou leia um código';
+    selecionado.textContent = 'Escolha um produto cadastrado na lista.';
+    atualizarResumo(); clearTimeout(temporizador); limparResultados();
     const consulta = busca.value.trim();
     if (!consulta) return;
     temporizador = setTimeout(async () => {
@@ -62,23 +152,28 @@
         const itens = await resposta.json();
         const exato = itens.find(p => p.ean === consulta || p.codigo_interno.toLowerCase() === consulta.toLowerCase());
         if (exato) selecionar(exato); else mostrarResultados(itens);
-      } catch (erro) { if (erro.name !== 'AbortError') selecionado.textContent = 'Nao foi possivel pesquisar os produtos.'; }
+      } catch (erro) { if (erro.name !== 'AbortError') selecionado.textContent = 'Não foi possível pesquisar os produtos.'; }
     }, 180);
   });
+  [quantidade, desconto].forEach(campo => campo.addEventListener('input', atualizarResumo));
   document.getElementById('form-venda').addEventListener('submit', (evento) => {
     if (!produtoId.value) { evento.preventDefault(); busca.focus(); selecionado.textContent = 'Selecione um produto do cadastro antes de vender.'; }
   });
-  const formaPagamento = document.getElementById('forma-pagamento');
+  const formasPagamento = document.querySelectorAll('input[name="forma_pagamento"]');
   const ajudaPagamento = document.getElementById('ajuda-pagamento');
   const botaoVenda = document.getElementById('botao-venda');
   function atualizarFormaPagamento() {
-    const point = formaPagamento.value === 'POINT';
-    ajudaPagamento.textContent = point
-      ? 'A cobranca aparecera na maquininha Point configurada pela loja.'
-      : 'O pagamento sera concluido no ambiente seguro do Mercado Pago.';
-    botaoVenda.textContent = point ? 'Vender e enviar ao Point' : 'Vender e abrir checkout';
+    const forma = document.querySelector('input[name="forma_pagamento"]:checked').value;
+    const point = forma === 'POINT';
+    ajudaPagamento.textContent = point ? 'A cobrança aparecerá na maquininha Point configurada pela loja.' : 'O pagamento será concluído no ambiente seguro do Mercado Pago.';
+    botaoVenda.querySelector('span').textContent = point ? 'Finalizar e enviar ao Point' : 'Finalizar e abrir checkout';
   }
-  formaPagamento.addEventListener('change', atualizarFormaPagamento);
+  formasPagamento.forEach(campo => campo.addEventListener('change', atualizarFormaPagamento));
+  window.addEventListener('keydown', (evento) => {
+    if (evento.key === 'F2') { evento.preventDefault(); busca.focus(); }
+    if (evento.key === 'F4') { evento.preventDefault(); quantidade.focus(); quantidade.select(); }
+  });
+  atualizarResumo();
   atualizarFormaPagamento();
 </script>
 {% endblock %}

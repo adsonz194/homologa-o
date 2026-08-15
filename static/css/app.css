@@ -140,6 +140,58 @@ body.app-body {
 .app-footer { padding: 24px 0 32px; color: var(--muted); font-size: .84rem; text-align: center; }
 .local-save-action .btn { min-width: 176px; }
 
+/* PDV / balcão ---------------------------------------------------------- */
+.pos-page { max-width: 1120px; margin: 0 auto; }
+.pos-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
+.pos-kicker { display: block; margin-bottom: 5px; color: var(--food); font-size: .72rem; font-weight: 850; letter-spacing: .12em; }
+.pos-header h1 { margin: 0; color: #172033; font-size: clamp(1.8rem, 4vw, 2.35rem); font-weight: 850; letter-spacing: -.055em; }
+.pos-header p { margin: 6px 0 0; color: var(--muted); }
+.pos-header-actions { display: flex; flex-wrap: wrap; gap: 9px; }
+.pos-layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(310px, .78fr); gap: 22px; align-items: start; }
+.pos-main-card { overflow: visible; }
+.pos-main-card .card-body { padding: clamp(1.25rem, 3vw, 2rem); }
+.pos-section-heading { display: flex; align-items: center; gap: 11px; margin-bottom: 16px; }
+.pos-section-heading h2 { margin: 0; font-size: 1.02rem; font-weight: 850; letter-spacing: -.02em; }
+.pos-section-heading p { margin: 2px 0 0; color: var(--muted); font-size: .81rem; }
+.pos-step { display: grid; flex: 0 0 auto; width: 29px; height: 29px; place-items: center; border-radius: 9px; color: #fff; background: var(--brand); box-shadow: 0 6px 13px rgba(79, 70, 229, .2); font-size: .8rem; font-weight: 850; }
+.pos-section-divider { height: 1px; margin: 26px 0; background: #e9edf5; }
+.pos-large-input, .pos-product-search .input-group-lg > .form-control { min-height: 52px; font-size: 1rem; }
+.pos-search-icon { width: 50px; justify-content: center; color: var(--brand); border-color: #cbd5e1; background: #f8faff; font-size: 1.45rem; font-weight: 800; }
+.pos-product-search #resultados-produto { z-index: 25; max-height: 260px; overflow-y: auto; border-radius: 0 0 12px 12px; }
+.pos-product-result { padding: .8rem 1rem; border-color: #e7ecf3; }
+.pos-product-result strong { display: block; color: var(--ink); }
+.pos-product-result small { display: block; margin-top: 3px; color: var(--muted); }
+.pos-payment-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+.pos-payment-option { display: flex; min-height: 88px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; margin: 0; border: 1px solid #d9e0eb; border-radius: 13px; color: #475569; background: #fff; cursor: pointer; font-size: .81rem; font-weight: 800; transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease; }
+.pos-payment-option:hover { border-color: #a5b4fc; color: var(--brand); transform: translateY(-1px); }
+.btn-check:checked + .pos-payment-option { border-color: var(--brand); color: var(--brand-dark); background: var(--brand-soft); box-shadow: inset 0 0 0 1px var(--brand); }
+.pos-payment-icon { display: grid; width: 25px; height: 25px; place-items: center; color: inherit; font-size: 1.28rem; line-height: 1; }
+.pos-summary-card { position: sticky; top: 88px; border: 0; color: #eef2ff; background: linear-gradient(152deg, #20265a, #323aa2); box-shadow: 0 22px 40px rgba(39, 50, 142, .22); }
+.pos-summary-card .card-body { padding: 1.45rem; }
+.pos-summary-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 9px; margin-bottom: 20px; }
+.pos-summary-heading span:first-child { display: block; color: #b9c2ff; font-size: .64rem; font-weight: 850; letter-spacing: .1em; }
+.pos-summary-heading h2 { margin: 4px 0 0; color: #fff; font-size: 1.25rem; font-weight: 850; letter-spacing: -.035em; }
+.pos-live-dot { white-space: nowrap; color: #9ff7c9; font-size: .68rem; font-weight: 800; }
+.pos-product-preview { display: flex; align-items: center; gap: 10px; min-height: 72px; margin-bottom: 18px; padding: 12px; border: 1px solid rgba(255,255,255,.14); border-radius: 13px; background: rgba(10, 15, 62, .26); }
+.pos-product-preview-icon { display: grid; flex: 0 0 auto; width: 37px; height: 37px; place-items: center; border-radius: 10px; color: #dce2ff; background: rgba(255,255,255,.12); font-size: 1.22rem; }
+.pos-product-preview strong { display: block; overflow: hidden; color: #fff; font-size: .86rem; text-overflow: ellipsis; white-space: nowrap; }
+.pos-product-preview small { display: block; overflow: hidden; margin-top: 4px; color: #c4cbef; font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
+.pos-adjustments { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pos-adjustments > div:last-child { grid-column: 1 / -1; }
+.pos-summary-card .form-label { color: #dce2ff; font-size: .72rem; }
+.pos-summary-card .form-control, .pos-summary-card .input-group-text { border-color: transparent; background: #fff; }
+.pos-summary-card .input-group-text { color: #4b5563; font-size: .78rem; }
+.pos-number-input { text-align: center; font-weight: 800; }
+.pos-total-row { display: flex; align-items: end; justify-content: space-between; gap: 10px; margin: 25px 0 17px; padding-top: 18px; border-top: 1px dashed rgba(255,255,255,.25); color: #d8def7; font-size: .83rem; }
+.pos-total-row strong { color: #fff; font-size: 1.72rem; font-weight: 850; letter-spacing: -.06em; white-space: nowrap; }
+.pos-submit { display: flex; width: 100%; min-height: 54px; align-items: center; justify-content: space-between; border: 0; color: #fff; background: #0da56f; box-shadow: 0 10px 20px rgba(0, 0, 0, .19); }
+.pos-submit:hover, .pos-submit:focus { color: #fff; background: #07855a; }
+.pos-submit > span:last-child { font-size: 1.35rem; line-height: 1; }
+.pos-cancel-link { display: block; margin-top: 14px; color: #d6dcf5; font-size: .78rem; font-weight: 700; text-align: center; text-decoration: none; }
+.pos-cancel-link:hover { color: #fff; text-decoration: underline; }
+.pos-shortcuts { margin: 19px 0 0; color: #b8c1ed; font-size: .66rem; text-align: center; }
+.pos-shortcuts kbd { margin: 0 3px; padding: .14rem .26rem; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; color: #eef1ff; background: rgba(255,255,255,.1); font-size: .62rem; }
+
 @media (max-width: 767.98px) {
   .app-header { position: static; padding: 10px 0; }
   .app-navbar { align-items: flex-start; gap: 10px; }
@@ -189,4 +241,16 @@ body.app-body {
   .d-flex.justify-content-between.align-items-center.mb-3 { flex-wrap: wrap; gap: 12px; }
   .d-flex.justify-content-between.align-items-center.mb-3 .btn { width: 100%; }
   .local-save-action .btn { width: 100%; }
+  .pos-header { align-items: flex-start; flex-direction: column; margin-bottom: 17px; }
+  .pos-header-actions { width: 100%; }
+  .pos-header-actions .btn { flex: 1; }
+  .pos-layout { grid-template-columns: 1fr; gap: 16px; }
+  .pos-main-card .card-body { padding: 1.1rem; }
+  .pos-section-divider { margin: 21px 0; }
+  .pos-payment-grid { gap: 7px; }
+  .pos-payment-option { min-height: 75px; border-radius: 11px; font-size: .72rem; }
+  .pos-payment-icon { font-size: 1.1rem; }
+  .pos-summary-card { position: static; }
+  .pos-summary-card .card-body { padding: 1.15rem; }
+  .pos-total-row strong { font-size: 1.6rem; }
 }
