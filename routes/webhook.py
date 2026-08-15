@@ -51,7 +51,7 @@ def receber_webhook():
     if not recurso_id:
         return jsonify(recebido=True), 200
     try:
-        if tipo == "order":
+        if tipo in {"order", "orders"}:
             # Orders do Point carregam a referencia VENDA-<id>. A consulta
             # confirma o status final antes de alterar estoque/pagamento.
             venda = obter_venda_por_ordem_point(str(recurso_id))
