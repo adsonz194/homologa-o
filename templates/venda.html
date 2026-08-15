@@ -4,7 +4,7 @@
 <div class="card shadow-sm"><div class="card-body p-4">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4"><h1 class="h3 mb-0">Cadastrar venda</h1>{% if usuario.papel == 'DONO' %}<a class="btn btn-outline-primary btn-sm" href="{{ url_for('produtos.novo') }}">Cadastrar produto</a>{% endif %}</div>
   <form method="post" class="row g-3" id="form-venda">
-    <div class="col-md-6"><label class="form-label">Nome do cliente</label><input class="form-control" name="cliente" required></div>
+    <div class="col-md-6"><label class="form-label">Cliente ou numero da mesa</label><input class="form-control" name="cliente" maxlength="120" placeholder="Ex.: Mesa 12 ou Maria Silva" required><div class="form-text">Informe a mesa para consumo no local ou o nome para retirada.</div></div>
     <div class="col-md-6 position-relative">
       <label class="form-label" for="busca-produto">Produto</label>
       <input class="form-control" id="busca-produto" placeholder="EAN, codigo interno ou descricao" autocomplete="off" required>
@@ -15,8 +15,8 @@
     <div class="col-md-4"><label class="form-label">Quantidade</label><input class="form-control" id="quantidade" name="quantidade" type="number" min="1" value="1" required></div>
     <div class="col-md-4"><label class="form-label">Valor unitario (R$)</label><input class="form-control" id="valor-unitario" type="number" min="0" step="0.01" readonly required></div>
     <div class="col-md-4"><label class="form-label">Desconto (R$)</label><input class="form-control" name="desconto" type="number" min="0" step="0.01" value="0"></div>
-    <div class="col-md-6"><label class="form-label">Forma de pagamento</label><select class="form-select" name="forma_pagamento" required><option value="PIX">Pix</option><option value="CREDITO">Cartao de credito</option><option value="DEBITO">Cartao de debito</option></select><div class="form-text">O pagamento sera concluido no ambiente seguro do Mercado Pago.</div></div>
-    <div class="col-12 d-grid gap-2 d-sm-flex"><button class="btn btn-success">Vender e abrir checkout</button><a class="btn btn-outline-secondary" href="{{ url_for('vendas.index') }}">Cancelar</a></div>
+    <div class="col-md-6"><label class="form-label">Forma de pagamento</label><select class="form-select" id="forma-pagamento" name="forma_pagamento" required><option value="PIX">Pix</option><option value="CREDITO">Cartao de credito</option><option value="DEBITO">Cartao de debito</option><option value="POINT">Cartao na maquininha Point</option></select><div class="form-text" id="ajuda-pagamento">O pagamento sera concluido no ambiente seguro do Mercado Pago.</div></div>
+    <div class="col-12 d-grid gap-2 d-sm-flex"><button class="btn btn-success" id="botao-venda">Vender e abrir checkout</button><a class="btn btn-outline-secondary" href="{{ url_for('vendas.index') }}">Cancelar</a></div>
   </form>
 </div></div>
 <script>
@@ -68,5 +68,17 @@
   document.getElementById('form-venda').addEventListener('submit', (evento) => {
     if (!produtoId.value) { evento.preventDefault(); busca.focus(); selecionado.textContent = 'Selecione um produto do cadastro antes de vender.'; }
   });
+  const formaPagamento = document.getElementById('forma-pagamento');
+  const ajudaPagamento = document.getElementById('ajuda-pagamento');
+  const botaoVenda = document.getElementById('botao-venda');
+  function atualizarFormaPagamento() {
+    const point = formaPagamento.value === 'POINT';
+    ajudaPagamento.textContent = point
+      ? 'A cobranca aparecera na maquininha Point configurada pela loja.'
+      : 'O pagamento sera concluido no ambiente seguro do Mercado Pago.';
+    botaoVenda.textContent = point ? 'Vender e enviar ao Point' : 'Vender e abrir checkout';
+  }
+  formaPagamento.addEventListener('change', atualizarFormaPagamento);
+  atualizarFormaPagamento();
 </script>
 {% endblock %}

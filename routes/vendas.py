@@ -1,6 +1,7 @@
 from datetime import date
+from io import BytesIO
 from decimal import Decimal, InvalidOperation
-from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, flash, g, redirect, render_template, request, send_file, url_for
 from routes.auth import permission_required
 from models import (
     EstoqueInsuficiente, criar_venda, data_hora_loja, listar_vendas,
@@ -8,7 +9,7 @@ from models import (
 )
 
 vendas_bp = Blueprint("vendas", __name__)
-FORMAS_PAGAMENTO = {"PIX", "CREDITO", "DEBITO"}
+FORMAS_PAGAMENTO = {"PIX", "CREDITO", "DEBITO", "POINT"}
 
 @vendas_bp.get("/")
 def inicio():
@@ -73,11 +74,18 @@ def nova_venda():
     except EstoqueInsuficiente as erro:
         flash(str(erro), "danger")
         return render_template("venda.html"), 400
+    point = forma == "POINT"
     return render_template(
         "iniciar_pagamento.html",
-        destino=url_for("pagamentos.criar_checkout", venda_id=venda_id),
-        titulo="Preparando o checkout",
-        descricao="Abrindo o ambiente seguro do Mercado Pago.",
+        destino=url_for(
+            "pagamentos.criar_cobranca_point" if point else "pagamentos.criar_checkout",
+            venda_id=venda_id,
+        ),
+        titulo="Enviando para a maquininha" if point else "Preparando o checkout",
+        descricao=(
+            "A cobranca sera exibida no terminal Mercado Pago Point."
+            if point else "Abrindo o ambiente seguro do Mercado Pago."
+        ),
         auto_submit=True,
     )
 
@@ -87,3 +95,21 @@ def sucesso(venda_id):
     venda = obter_venda(venda_id, g.usuario["estabelecimento_id"])
     if venda is None: return "Venda não encontrada", 404
     return render_template("sucesso.html", venda=venda)
+
+
+@vendas_bp.get("/vendas/<int:venda_id>/comprovante.pdf")
+@permission_required("VENDAS")
+def comprovante_pdf(venda_id):
+    from nota_pdf import gerar_comprovante_venda_pdf
+
+    venda = obter_venda(venda_id, g.usuario["estabelecimento_id"])
+    if venda is None:
+        return "Venda nao encontrada", 404
+    estabelecimento = obter_estabelecimento(g.usuario["estabelecimento_id"])
+    arquivo = gerar_comprovante_venda_pdf(venda, estabelecimento)
+    return send_file(
+        BytesIO(arquivo),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"cupom-venda-{venda_id:06d}.pdf",
+    )

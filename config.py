@@ -10,6 +10,8 @@ class Config:
     DATABASE = Path(os.getenv("DATABASE", str(BASE_DIR / "database.db")))
     MERCADOPAGO_PUBLIC_KEY = os.getenv("MERCADOPAGO_PUBLIC_KEY", "")
     MERCADOPAGO_ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN", "")
+    MERCADOPAGO_POINT_ACCESS_TOKEN = os.getenv("MERCADOPAGO_POINT_ACCESS_TOKEN", "")
+    MERCADOPAGO_POINT_TERMINAL_ID = os.getenv("MERCADOPAGO_POINT_TERMINAL_ID", "")
     BASE_URL = os.getenv("BASE_URL", "http://localhost:5000").rstrip("/")
     HOST = os.getenv("HOST", "0.0.0.0")
     PORT = int(os.getenv("PORT", "5000"))

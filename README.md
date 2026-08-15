@@ -150,6 +150,12 @@ Copie a **assinatura secreta** gerada pelo painel para `MERCADOPAGO_WEBHOOK_SECR
 
 O Mercado Pago exige URL HTTPS publica para notificacoes e retornos. Em desenvolvimento, use credenciais de teste e deixe `BASE_URL=http://localhost:5000`.
 
+## Venda presencial com Mercado Pago Point
+
+No painel do dono, abra **Configuracoes** e preencha o **Access Token do Point** e o **ID do terminal Point**. Essa credencial fica separada do token do Checkout Pro. A maquininha precisa estar vinculada a mesma conta Mercado Pago e configurada no modo **PDV**.
+
+Em **Nova venda**, informe o cliente ou a mesa, selecione **Cartao na maquininha Point** e conclua. A cobranca aparece no Point e a tela acompanha o resultado; o sistema tambem aceita notificacoes de `order` no mesmo webhook configurado para a instalacao. O botao **PDF 80 mm** gera um comprovante operacional para imprimir pelo driver da Bematech, Elgin i9 ou outra impressora configurada com bobina de 80 mm. Nao e NF-e nem NFC-e.
+
 ## Verificacao apos publicar
 
 ```bash

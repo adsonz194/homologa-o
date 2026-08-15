@@ -5,20 +5,24 @@ from urllib.request import Request, urlopen
 from uuid import uuid4
 
 import mercadopago
-from flask import Blueprint, current_app, flash, g, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, flash, g, jsonify, redirect, render_template, request, session, url_for
 from itsdangerous import BadData, SignatureExpired, URLSafeTimedSerializer
 
 from models import (
     atualizar_pagamento,
     atualizar_pagamento_pedido,
+    atualizar_ordem_point_venda,
     atualizar_preferencia,
     atualizar_preferencia_pedido,
     itens_pedido,
     obter_token_mercadopago,
     obter_url_publica_estabelecimento,
     obter_pedido,
+    obter_terminal_point_mercadopago,
+    obter_token_point_mercadopago,
+    obter_venda,
 )
-from routes.auth import owner_required
+from routes.auth import permission_required
 
 pagamentos_bp = Blueprint("pagamentos", __name__)
 API_URL = "https://api.mercadopago.com"
@@ -123,6 +127,34 @@ def requisicao_api(metodo, caminho, corpo=None, estabelecimento_id=None):
         raise MercadoPagoError(0, {"message": f"Falha de rede: {erro.reason}"}) from erro
 
 
+def requisicao_api_point(metodo, caminho, corpo=None, estabelecimento_id=None):
+    """Chama a API Orders do Point com a credencial exclusiva do terminal."""
+    token = obter_token_point_mercadopago(estabelecimento_id)
+    if not token:
+        raise MercadoPagoError(0, {"message": "Token do Mercado Pago Point nao configurado"})
+    dados = json.dumps(corpo).encode("utf-8") if corpo is not None else None
+    cabecalhos = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    if metodo in {"POST", "PUT", "PATCH"}:
+        cabecalhos["X-Idempotency-Key"] = str(uuid4())
+    requisicao = Request(f"{API_URL}{caminho}", data=dados, headers=cabecalhos, method=metodo)
+    try:
+        with urlopen(requisicao, timeout=20) as resposta:
+            conteudo = resposta.read().decode("utf-8")
+            return json.loads(conteudo) if conteudo else {}
+    except HTTPError as erro:
+        try:
+            detalhes = json.loads(erro.read().decode("utf-8"))
+        except Exception:
+            detalhes = {"message": "Resposta invalida da API Point"}
+        raise MercadoPagoError(erro.code, detalhes) from erro
+    except URLError as erro:
+        raise MercadoPagoError(0, {"message": f"Falha de rede: {erro.reason}"}) from erro
+
+
 def criar_preferencia(preference, estabelecimento_id=None):
     token = obter_token_mercadopago(estabelecimento_id)
     if not token:
@@ -162,6 +194,61 @@ STATUS_PAGAMENTO = {
     "charged_back": "CANCELADO",
 }
 
+STATUS_POINT = {
+    "processed": "APROVADO",
+    "failed": "REJEITADO",
+    "canceled": "CANCELADO",
+    "cancelled": "CANCELADO",
+    "expired": "CANCELADO",
+    "refunded": "CANCELADO",
+    "created": "PENDENTE",
+    "at_terminal": "PENDENTE",
+    "action_required": "PENDENTE",
+}
+
+
+def status_pagamento_point(status):
+    return STATUS_POINT.get(str(status or "").lower(), "PENDENTE")
+
+
+def criar_ordem_point(venda):
+    """Envia uma cobranca presencial ao terminal Point configurado."""
+    estabelecimento_id = venda["estabelecimento_id"]
+    terminal_id = obter_terminal_point_mercadopago(estabelecimento_id)
+    if not terminal_id:
+        raise MercadoPagoError(0, {"message": "ID do terminal Point nao configurado"})
+    descricao = f"Venda {venda['id']} - {venda['cliente']}"
+    ordem = {
+        "type": "point",
+        "external_reference": f"VENDA-{venda['id']}",
+        "description": descricao[:256],
+        "transactions": {"payments": [{"amount": f"{float(venda['valor_total']):.2f}"}]},
+        "config": {"point": {"terminal_id": terminal_id, "print_on_terminal": "no_ticket"}},
+    }
+    resposta = requisicao_api_point("POST", "/v1/orders", ordem, estabelecimento_id)
+    order_id = str(resposta.get("id") or "")
+    if not order_id:
+        raise MercadoPagoError(0, {"message": "O Point nao retornou o identificador da cobranca"})
+    atualizar_ordem_point_venda(venda["id"], order_id, status_pagamento_point(resposta.get("status")))
+    return resposta
+
+
+def sincronizar_ordem_point_venda(venda_id, estabelecimento_id=None):
+    """Consulta a order do Point e mantém o pagamento da venda atualizado."""
+    venda = obter_venda(venda_id, estabelecimento_id)
+    if venda is None or not venda["point_order_id"]:
+        return None
+    resposta = requisicao_api_point(
+        "GET", f"/v1/orders/{venda['point_order_id']}", None, venda["estabelecimento_id"]
+    )
+    status = status_pagamento_point(resposta.get("status"))
+    atualizar_pagamento(venda["id"], status)
+    return {
+        "status": status,
+        "status_point": resposta.get("status") or "desconhecido",
+        "status_detail": resposta.get("status_detail") or "",
+    }
+
 
 def sincronizar_pagamento_pedido(pedido_id, payment_id):
     pedido = obter_pedido(pedido_id)
@@ -195,9 +282,8 @@ def reembolsar_pedido(pedido):
 
 
 @pagamentos_bp.post("/pagamentos/checkout/<int:venda_id>")
-@owner_required
+@permission_required("VENDAS")
 def criar_checkout(venda_id):
-    from models import obter_venda
     venda = obter_venda(venda_id, g.usuario["estabelecimento_id"])
     if venda is None:
         return "Venda nao encontrada", 404
@@ -225,6 +311,52 @@ def criar_checkout(venda_id):
         atualizar_pagamento(venda_id, "CANCELADO")
         flash("Nao foi possivel abrir o checkout. Confira as credenciais e tente novamente.", "danger")
     return redirect(url_for("vendas.sucesso", venda_id=venda_id))
+
+
+@pagamentos_bp.post("/pagamentos/point/<int:venda_id>")
+@permission_required("VENDAS")
+def criar_cobranca_point(venda_id):
+    venda = obter_venda(venda_id, g.usuario["estabelecimento_id"])
+    if venda is None:
+        return "Venda nao encontrada", 404
+    if venda["forma_pagamento"] != "POINT":
+        return "Forma de pagamento invalida para o Point", 400
+    if venda["valor_total"] <= 0:
+        flash("O total da venda deve ser maior que R$ 0,00 para cobrar no Point.", "danger")
+        return redirect(url_for("vendas.sucesso", venda_id=venda_id))
+    try:
+        resposta = criar_ordem_point(venda)
+        current_app.logger.info("Cobranca Point criada para a venda %s.", venda_id)
+        flash("Cobranca enviada para a maquininha Point. Aguarde a confirmacao do cartao.", "info")
+        return redirect(url_for("vendas.sucesso", venda_id=venda_id, point_enviado="1"))
+    except MercadoPagoError as erro:
+        current_app.logger.error("Point recusou a cobranca da venda %s (HTTP %s): %s", venda_id, erro.status, erro.detalhes)
+        atualizar_pagamento(venda_id, "CANCELADO")
+        flash(f"Nao foi possivel enviar ao Point: {mensagem_erro(erro.detalhes)}.", "danger")
+    except Exception:
+        current_app.logger.exception("Falha ao criar cobranca Point para a venda %s", venda_id)
+        atualizar_pagamento(venda_id, "CANCELADO")
+        flash("Nao foi possivel enviar a cobranca para a maquininha. Confira o token e o terminal Point.", "danger")
+    return redirect(url_for("vendas.sucesso", venda_id=venda_id))
+
+
+@pagamentos_bp.get("/pagamentos/point/<int:venda_id>/status")
+@permission_required("VENDAS")
+def consultar_status_point(venda_id):
+    venda = obter_venda(venda_id, g.usuario["estabelecimento_id"])
+    if venda is None:
+        return jsonify(erro="Venda nao encontrada"), 404
+    if venda["forma_pagamento"] != "POINT" or not venda["point_order_id"]:
+        return jsonify(erro="Cobranca Point indisponivel"), 400
+    try:
+        resultado = sincronizar_ordem_point_venda(venda_id, g.usuario["estabelecimento_id"])
+        return jsonify(resultado)
+    except MercadoPagoError as erro:
+        current_app.logger.warning("Nao foi possivel consultar Point da venda %s: %s", venda_id, erro.detalhes)
+        return jsonify(erro=mensagem_erro(erro.detalhes)), 502
+    except Exception:
+        current_app.logger.exception("Falha ao consultar Point da venda %s", venda_id)
+        return jsonify(erro="Falha temporaria ao consultar a maquininha"), 502
 
 
 @pagamentos_bp.route("/pagamentos/pedido/<int:pedido_id>", methods=["GET", "POST"])

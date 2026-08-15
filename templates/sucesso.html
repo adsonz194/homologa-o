@@ -4,7 +4,38 @@
 <div class="card shadow-sm"><div class="card-body p-4">
   <h1 class="h3">Venda #{{ venda.id }}</h1>
   <p><strong>Cliente:</strong> {{ venda.cliente }}</p><p><strong>Produto:</strong> {{ venda.produto }} &times; {{ venda.quantidade }}</p>
-  <p><strong>Total:</strong> R$ {{ '%.2f'|format(venda.valor_total) }}</p><p><strong>Status:</strong> {{ venda.status_pagamento }}</p>
-  {% if usuario %}<a class="btn btn-primary" href="{{ url_for('vendas.index') }}">Ver historico</a>{% else %}<a class="btn btn-primary" href="{{ url_for('vendas.inicio') }}">Pagina inicial</a>{% endif %}
+  <p><strong>Total:</strong> R$ {{ '%.2f'|format(venda.valor_total) }}</p><p><strong>Status:</strong> <span id="status-pagamento">{{ venda.status_pagamento }}</span></p>
+  {% if venda.forma_pagamento == 'POINT' %}<div class="alert alert-info" id="aviso-point"><strong>Cobranca Point:</strong> aguardando a resposta da maquininha. Esta pagina atualiza o status automaticamente.</div>{% endif %}
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('vendas.comprovante_pdf', venda_id=venda.id) }}">Baixar cupom 80 mm</a>
+    {% if usuario %}<a class="btn btn-primary" href="{{ url_for('vendas.index') }}">Ver historico</a>{% else %}<a class="btn btn-primary" href="{{ url_for('vendas.inicio') }}">Pagina inicial</a>{% endif %}
+  </div>
 </div></div>
+{% if venda.forma_pagamento == 'POINT' and venda.point_order_id and venda.status_pagamento == 'PENDENTE' %}
+<script>
+  const statusVenda = document.getElementById('status-pagamento');
+  const avisoPoint = document.getElementById('aviso-point');
+  let tentativasPoint = 0;
+  const intervaloPoint = window.setInterval(async () => {
+    tentativasPoint += 1;
+    try {
+      const resposta = await fetch('{{ url_for("pagamentos.consultar_status_point", venda_id=venda.id) }}', {cache: 'no-store'});
+      if (!resposta.ok) throw new Error('consulta indisponivel');
+      const dados = await resposta.json();
+      statusVenda.textContent = dados.status;
+      const detalhe = dados.status_detail ? ` (${dados.status_detail})` : '';
+      avisoPoint.textContent = `Point: ${dados.status_point}${detalhe}.`;
+      if (dados.status !== 'PENDENTE') {
+        window.clearInterval(intervaloPoint);
+        avisoPoint.className = dados.status === 'APROVADO' ? 'alert alert-success' : 'alert alert-danger';
+      }
+    } catch (_erro) {
+      if (tentativasPoint >= 20) {
+        window.clearInterval(intervaloPoint);
+        avisoPoint.textContent = 'Nao foi possivel atualizar agora. Consulte o historico apos concluir na maquininha.';
+      }
+    }
+  }, 3000);
+</script>
+{% endif %}
 {% endblock %}

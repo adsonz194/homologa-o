@@ -33,6 +33,8 @@ from models import (
     obter_funcionario,
     obter_segredo_webhook_mercadopago,
     obter_token_mercadopago,
+    obter_terminal_point_mercadopago,
+    obter_token_point_mercadopago,
     obter_usuario_por_nome,
     obter_usuario_por_recuperacao,
     quantidade_solicitacoes_recuperacao,
@@ -468,6 +470,8 @@ def configuracoes():
             horario_encerramento = _horario_valido(request.form.get("horario_encerramento", ""))
             access_token = request.form.get("mercadopago_access_token", "").strip()
             webhook_secret = request.form.get("mercadopago_webhook_secret", "").strip()
+            point_access_token = request.form.get("mercadopago_point_access_token", "").strip()
+            point_terminal_id = request.form.get("mercadopago_point_terminal_id", "").strip()
             email_recuperacao = request.form.get("email_recuperacao", "").strip().lower()
             endereco = urlparse(url_publica)
             if (
@@ -485,6 +489,8 @@ def configuracoes():
                 or (horario_encerramento != "00:00" and horario_abertura > horario_encerramento)
                 or len(access_token) > 500
                 or len(webhook_secret) > 500
+                or len(point_access_token) > 500
+                or len(point_terminal_id) > 128
                 or (email_recuperacao and not email_recuperacao_valido(email_recuperacao))
                 or email_recuperacao_em_uso(g.usuario["id"], email_recuperacao)
             ):
@@ -493,6 +499,7 @@ def configuracoes():
             atualizar_configuracao_estabelecimento(
                 estabelecimento["id"], nome, razao_social, cnpj, endereco_loja, telefone, whatsapp, valor_entrega, url_publica,
                 ",".join(dias), horario_abertura, horario_encerramento, access_token, webhook_secret,
+                point_access_token, point_terminal_id,
             )
             flash("Configuracoes salvas. Horarios, frete e e-mail de recuperacao foram atualizados.", "success")
             return redirect(url_for("auth.configuracoes"))
@@ -505,6 +512,8 @@ def configuracoes():
         url_publica=estabelecimento["url_publica"] or current_app.config["BASE_URL"],
         token_configurado=bool(obter_token_mercadopago(estabelecimento["id"])),
         webhook_configurado=bool(obter_segredo_webhook_mercadopago(estabelecimento["id"])),
+        point_token_configurado=bool(obter_token_point_mercadopago(estabelecimento["id"])),
+        point_terminal_id=obter_terminal_point_mercadopago(estabelecimento["id"]),
         dias_funcionamento=DIAS_FUNCIONAMENTO,
         dias_selecionados=set(str(estabelecimento["dias_funcionamento"] or "").split(",")),
         funcionamento=status_funcionamento_estabelecimento(estabelecimento),

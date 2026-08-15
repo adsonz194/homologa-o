@@ -48,6 +48,8 @@ def init_db():
         horario_encerramento TEXT NOT NULL DEFAULT '22:00',
         fechado_hoje_data TEXT,
         mercadopago_token_criptografado TEXT,
+        mercadopago_point_token_criptografado TEXT,
+        mercadopago_point_terminal_id TEXT NOT NULL DEFAULT '',
         webhook_secret_criptografado TEXT,
         identificador_instalacao TEXT,
         certificado_licenca_criptografado TEXT,
@@ -62,7 +64,8 @@ def init_db():
         quantidade INTEGER NOT NULL CHECK(quantidade > 0), valor_unitario REAL NOT NULL CHECK(valor_unitario >= 0),
         desconto REAL NOT NULL DEFAULT 0 CHECK(desconto >= 0), valor_total REAL NOT NULL,
         forma_pagamento TEXT NOT NULL, status_pagamento TEXT NOT NULL DEFAULT 'PENDENTE',
-        preference_id TEXT, payment_id TEXT, criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        preference_id TEXT, payment_id TEXT, point_order_id TEXT,
+        criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
     db.execute("""CREATE TABLE IF NOT EXISTS produtos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         codigo_interno TEXT NOT NULL UNIQUE,
@@ -227,6 +230,10 @@ def init_db():
         )
     if "fechado_hoje_data" not in colunas_estabelecimentos:
         db.execute("ALTER TABLE estabelecimentos ADD COLUMN fechado_hoje_data TEXT")
+    if "mercadopago_point_token_criptografado" not in colunas_estabelecimentos:
+        db.execute("ALTER TABLE estabelecimentos ADD COLUMN mercadopago_point_token_criptografado TEXT")
+    if "mercadopago_point_terminal_id" not in colunas_estabelecimentos:
+        db.execute("ALTER TABLE estabelecimentos ADD COLUMN mercadopago_point_terminal_id TEXT NOT NULL DEFAULT ''")
     if "razao_social" not in colunas_estabelecimentos:
         db.execute("ALTER TABLE estabelecimentos ADD COLUMN razao_social TEXT NOT NULL DEFAULT ''")
     if "cnpj" not in colunas_estabelecimentos:
@@ -274,6 +281,8 @@ def init_db():
         db.execute("ALTER TABLE vendas ADD COLUMN estoque_reservado INTEGER NOT NULL DEFAULT 0")
     if "estabelecimento_id" not in colunas_vendas:
         db.execute("ALTER TABLE vendas ADD COLUMN estabelecimento_id INTEGER")
+    if "point_order_id" not in colunas_vendas:
+        db.execute("ALTER TABLE vendas ADD COLUMN point_order_id TEXT")
     colunas_produtos = {coluna["name"] for coluna in db.execute("PRAGMA table_info(produtos)")}
     if "disponivel" not in colunas_produtos:
         db.execute("ALTER TABLE produtos ADD COLUMN disponivel INTEGER NOT NULL DEFAULT 1")
@@ -362,6 +371,7 @@ def init_db():
     db.execute("CREATE INDEX IF NOT EXISTS idx_produtos_estabelecimento ON produtos(estabelecimento_id, descricao)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_produto_complementos_produto ON produto_complementos(produto_id, ativo)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_vendas_estabelecimento ON vendas(estabelecimento_id, id)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_vendas_point_order ON vendas(point_order_id)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_pedidos_estabelecimento ON pedidos(estabelecimento_id, id)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_usuarios_estabelecimento ON usuarios(estabelecimento_id, usuario)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_tentativas_login_ip_data ON tentativas_login(endereco_ip, criado_em)")

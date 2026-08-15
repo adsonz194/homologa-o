@@ -35,6 +35,14 @@ def _altura_cupom(itens):
     return max(182 * mm, (148 + 9 * len(itens) + 3.8 * linhas_itens) * mm)
 
 
+def _altura_cupom_venda(venda):
+    """Evita uma sobra grande de papel sem cortar textos longos do balcão."""
+    linhas_produto = max(1, (len(str(venda["produto"] or "")) + 28) // 29)
+    linhas_atendimento = max(1, (len(str(venda["cliente"] or "")) + 48) // 49)
+    linhas_point = 2 if venda["forma_pagamento"] == "POINT" else 1
+    return max(145 * mm, (129 + 4.2 * linhas_produto + 3.5 * linhas_atendimento + 3 * linhas_point) * mm)
+
+
 def _fundo_cupom(canvas, documento):
     canvas.saveState()
     largura, altura = documento.pagesize
@@ -176,6 +184,116 @@ def gerar_comprovante_pedido_pdf(pedido, itens, estabelecimento):
     secoes.append(Paragraph(f"<b>STATUS DO PEDIDO:</b> {texto(pedido['status_operacional'])}", normal))
     if pedido["modalidade_entrega"] == "ENTREGA" and pedido["codigo_entrega"]:
         secoes.extend([Spacer(1, 1.8 * mm), Paragraph(f"<b>CODIGO DE ENTREGA: {texto(pedido['codigo_entrega'])}</b>", centralizado), Paragraph("Informe este codigo somente ao entregador na entrega.", centro_pequeno)])
+    secoes.extend([
+        Spacer(1, 3 * mm), _linha_horizontal(), Spacer(1, 4 * mm),
+        Paragraph("ASSINATURA DO CLIENTE", centralizado), Spacer(1, 3 * mm), _linha_horizontal(), Spacer(1, 2 * mm),
+        Paragraph("DOCUMENTO OPERACIONAL - NAO POSSUI VALOR FISCAL", centralizado),
+        Paragraph("Obrigado e volte sempre!", centralizado),
+    ])
+    documento.build(secoes, onFirstPage=_fundo_cupom, onLaterPages=_fundo_cupom)
+    return arquivo.getvalue()
+
+
+def gerar_comprovante_venda_pdf(venda, estabelecimento):
+    """Gera um cupom operacional de balcão no papel térmico de 80 mm.
+
+    O PDF pode ser aberto no computador/celular e impresso pelo driver da
+    Bematech, Elgin i9 ou outra impressora configurada para bobina de 80 mm.
+    Não substitui documento fiscal.
+    """
+    arquivo = BytesIO()
+    documento = SimpleDocTemplate(
+        arquivo,
+        pagesize=(LARGURA_CUPOM, _altura_cupom_venda(venda)),
+        leftMargin=MARGEM,
+        rightMargin=MARGEM,
+        topMargin=5 * mm,
+        bottomMargin=5 * mm,
+        title=f"Comprovante da venda {venda['id']}",
+        author=estabelecimento["nome"] if estabelecimento else "AG Delivery",
+    )
+    estilos = getSampleStyleSheet()
+    cabecalho = ParagraphStyle(
+        "VendaCupomCabecalho", parent=estilos["BodyText"], fontName="Helvetica-Bold",
+        fontSize=10, leading=12, alignment=TA_CENTER, textColor=colors.black,
+    )
+    centralizado = ParagraphStyle(
+        "VendaCupomCentro", parent=estilos["BodyText"], fontSize=6.7, leading=8.3,
+        alignment=TA_CENTER, textColor=colors.black,
+    )
+    normal = ParagraphStyle(
+        "VendaCupomNormal", parent=estilos["BodyText"], fontSize=7, leading=8.4,
+        textColor=colors.black,
+    )
+    pequeno = ParagraphStyle("VendaCupomPequeno", parent=normal, fontSize=6, leading=7.2)
+    direita = ParagraphStyle("VendaCupomDireita", parent=normal, alignment=TA_RIGHT)
+    direita_pequeno = ParagraphStyle("VendaCupomDireitaPequeno", parent=pequeno, alignment=TA_RIGHT)
+    centro_pequeno = ParagraphStyle("VendaCupomCentroPequeno", parent=pequeno, alignment=TA_CENTER)
+    secoes = []
+
+    loja = estabelecimento or {}
+    nome = loja["nome"] if loja else "AG Delivery"
+    razao_social = loja["razao_social"] if loja and loja["razao_social"] else nome
+    secoes.append(Paragraph(texto(nome).upper(), cabecalho))
+    secoes.append(Paragraph(texto(razao_social).upper(), centralizado))
+    if loja and loja["endereco"]:
+        secoes.append(Paragraph(texto(loja["endereco"]), centralizado))
+    if loja and loja["telefone"]:
+        secoes.append(Paragraph(f"Tel.: {texto(loja['telefone'])}", centralizado))
+    if loja and loja["cnpj"]:
+        secoes.append(Paragraph(f"CNPJ: {texto(loja['cnpj'])}", centralizado))
+    secoes.extend([Spacer(1, 1.6 * mm), _linha_horizontal(), Spacer(1, 1.7 * mm)])
+
+    numero = f"{int(venda['id']):06d}"
+    informacoes = [
+        [Paragraph("<b>COMPROVANTE DE VENDA</b>", normal), Paragraph(f"<b>No {numero}</b>", direita)],
+        [Paragraph(f"Data: {texto(venda['criado_em'])}", pequeno), Paragraph("VENDA PRESENCIAL", direita_pequeno)],
+    ]
+    tabela_info = Table(informacoes, colWidths=[45 * mm, 25 * mm])
+    tabela_info.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.2 * mm),
+    ]))
+    secoes.extend([tabela_info, _linha_horizontal(), Spacer(1, 1.7 * mm)])
+    secoes.append(Paragraph(f"<b>ATENDIMENTO:</b> {texto(venda['cliente'])}", normal))
+    secoes.extend([Spacer(1, 1.6 * mm), _linha_horizontal(), Spacer(1, 1.4 * mm)])
+
+    linhas = [[
+        Paragraph("<b>DESCRICAO</b>", pequeno),
+        Paragraph("<b>QTD x UN.</b>", centro_pequeno),
+        Paragraph("<b>VALOR</b>", direita_pequeno),
+    ], [
+        Paragraph(texto(venda["produto"]), pequeno),
+        Paragraph(f"{venda['quantidade']} x<br/>{moeda(venda['valor_unitario'])}", centro_pequeno),
+        Paragraph(moeda(venda["quantidade"] * venda["valor_unitario"]), direita_pequeno),
+    ]]
+    tabela_itens = Table(linhas, colWidths=[41 * mm, 13 * mm, 16 * mm], repeatRows=1)
+    tabela_itens.setStyle(TableStyle([
+        ("LINEBELOW", (0, 0), (-1, 0), 0.5, COR_LINHA),
+        ("LINEBELOW", (0, 1), (-1, -1), 0.18, colors.HexColor("#777766")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0.5 * mm), ("RIGHTPADDING", (0, 0), (-1, -1), 0.5 * mm),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.0 * mm), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.0 * mm),
+    ]))
+    secoes.extend([tabela_itens, Spacer(1, 2 * mm), _linha_horizontal(), Spacer(1, 1.4 * mm)])
+
+    totais = []
+    if float(venda["desconto"] or 0) > 0:
+        totais.append([Paragraph("Desconto", normal), Paragraph(f"- {moeda(venda['desconto'])}", direita)])
+    totais.append([Paragraph("<b>Total da venda</b>", normal), Paragraph(f"<b>{moeda(venda['valor_total'])}</b>", direita)])
+    tabela_totais = Table(totais, colWidths=[47 * mm, 23 * mm])
+    tabela_totais.setStyle(TableStyle([
+        ("LINEABOVE", (0, -1), (-1, -1), 0.45, COR_LINHA),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0.8 * mm), ("BOTTOMPADDING", (0, 0), (-1, -1), 0.8 * mm),
+    ]))
+    secoes.extend([tabela_totais, Spacer(1, 1.4 * mm), _linha_horizontal(), Spacer(1, 1.6 * mm)])
+    forma = "CARTAO - MERCADO PAGO POINT" if venda["forma_pagamento"] == "POINT" else texto(venda["forma_pagamento"])
+    secoes.append(Paragraph(f"<b>FORMA DE PAGAMENTO:</b> {forma}", normal))
+    secoes.append(Paragraph(f"<b>STATUS DO PAGAMENTO:</b> {texto(venda['status_pagamento'])}", normal))
+    if venda["point_order_id"]:
+        secoes.append(Paragraph(f"<b>ORDEM POINT:</b> {texto(venda['point_order_id'])}", pequeno))
     secoes.extend([
         Spacer(1, 3 * mm), _linha_horizontal(), Spacer(1, 4 * mm),
         Paragraph("ASSINATURA DO CLIENTE", centralizado), Spacer(1, 3 * mm), _linha_horizontal(), Spacer(1, 2 * mm),

@@ -337,6 +337,25 @@ def obter_token_mercadopago(estabelecimento_id=None):
     return current_app.config["MERCADOPAGO_ACCESS_TOKEN"]
 
 
+def obter_token_point_mercadopago(estabelecimento_id=None):
+    """Obtém o token exclusivo do Point, sem reutilizar o Checkout Pro."""
+    estabelecimento = _estabelecimento_integracao(estabelecimento_id)
+    if estabelecimento is not None:
+        token = _descriptografar_configuracao(
+            estabelecimento["mercadopago_point_token_criptografado"]
+        )
+        if token:
+            return token
+    return current_app.config["MERCADOPAGO_POINT_ACCESS_TOKEN"]
+
+
+def obter_terminal_point_mercadopago(estabelecimento_id=None):
+    estabelecimento = _estabelecimento_integracao(estabelecimento_id)
+    if estabelecimento is not None and estabelecimento["mercadopago_point_terminal_id"]:
+        return str(estabelecimento["mercadopago_point_terminal_id"]).strip()
+    return current_app.config["MERCADOPAGO_POINT_TERMINAL_ID"].strip()
+
+
 def obter_segredo_webhook_mercadopago(estabelecimento_id=None):
     estabelecimento = _estabelecimento_integracao(estabelecimento_id)
     if estabelecimento is not None:
@@ -364,7 +383,8 @@ def obter_url_publica_estabelecimento(estabelecimento_id=None):
 
 def atualizar_configuracao_estabelecimento(
     estabelecimento_id, nome, razao_social, cnpj, endereco, telefone, whatsapp, valor_entrega, url_publica, dias_funcionamento,
-    horario_abertura, horario_encerramento, access_token="", webhook_secret=""
+    horario_abertura, horario_encerramento, access_token="", webhook_secret="",
+    point_access_token="", point_terminal_id=""
 ):
     """Atualiza configuracoes da loja sem devolver credenciais ao navegador."""
     campos = [
@@ -378,6 +398,12 @@ def atualizar_configuracao_estabelecimento(
     if webhook_secret:
         campos.append("webhook_secret_criptografado = ?")
         valores.append(_criptografar_configuracao(webhook_secret))
+    if point_access_token:
+        campos.append("mercadopago_point_token_criptografado = ?")
+        valores.append(_criptografar_configuracao(point_access_token))
+    if point_terminal_id:
+        campos.append("mercadopago_point_terminal_id = ?")
+        valores.append(point_terminal_id)
     valores.append(estabelecimento_id)
     db = get_db()
     db.execute(
@@ -423,6 +449,12 @@ def obter_venda(venda_id, estabelecimento_id=None):
         consulta += " AND estabelecimento_id = ?"
         parametros.append(estabelecimento_id)
     return get_db().execute(consulta, parametros).fetchone()
+
+
+def obter_venda_por_ordem_point(point_order_id):
+    return get_db().execute(
+        "SELECT * FROM vendas WHERE point_order_id = ?", (point_order_id,)
+    ).fetchone()
 
 
 def listar_vendas(estabelecimento_id):
@@ -472,6 +504,18 @@ def relatorio_vendas(estabelecimento_id, data_inicio, data_fim):
 def atualizar_preferencia(venda_id, preference_id):
     db = get_db()
     db.execute("UPDATE vendas SET preference_id = ? WHERE id = ?", (preference_id, venda_id))
+    db.commit()
+
+
+def atualizar_ordem_point_venda(venda_id, point_order_id, status="PENDENTE"):
+    """Registra a ordem enviada ao Point sem expor nenhuma credencial."""
+    db = get_db()
+    db.execute(
+        """UPDATE vendas
+           SET point_order_id = ?, status_pagamento = ?
+           WHERE id = ?""",
+        (point_order_id, status, venda_id),
+    )
     db.commit()
 
 
