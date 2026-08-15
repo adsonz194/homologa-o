@@ -59,12 +59,18 @@ def dados_produto_do_formulario():
     disponivel = request.form.get("disponivel") == "on"
     categoria = " ".join(request.form.get("categoria", "Geral").split()) or "Geral"
     imagem_url = normalizar_url_imagem(request.form.get("imagem_url", "").strip())
+    imagem_posicao_x = float(str(request.form.get("imagem_posicao_x", "50")).replace(",", "."))
+    imagem_posicao_y = float(str(request.form.get("imagem_posicao_y", "50")).replace(",", "."))
     if (
         not codigo_interno or not descricao or (ean and not ean.isdigit())
         or valor_unitario <= 0 or estoque < 0 or not 1 <= len(categoria) <= 60
+        or not 0 <= imagem_posicao_x <= 100 or not 0 <= imagem_posicao_y <= 100
     ):
         raise ValueError
-    return codigo_interno, ean, descricao, valor_unitario, estoque, disponivel, categoria, imagem_url
+    return (
+        codigo_interno, ean, descricao, valor_unitario, estoque, disponivel, categoria,
+        imagem_url, imagem_posicao_x, imagem_posicao_y,
+    )
 
 
 def dados_complementos_do_formulario():

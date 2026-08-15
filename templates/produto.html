@@ -9,7 +9,16 @@
     <div class="col-md-8"><label class="form-label">Descricao</label><input class="form-control" name="descricao" value="{{ produto.descricao if produto else '' }}" maxlength="150" required></div>
     <div class="col-md-4"><label class="form-label">Valor unitario (R$)</label><input class="form-control" name="valor_unitario" type="number" min="0.01" step="0.01" value="{{ produto.valor_unitario if produto else '' }}" required></div>
     <div class="col-md-6"><label class="form-label">Categoria</label><input class="form-control" name="categoria" value="{{ produto.categoria if produto else 'Geral' }}" maxlength="60" placeholder="Ex.: Lanches, Bebidas, Sobremesas" required><div class="form-text">Itens da mesma categoria ficam agrupados no cardapio.</div></div>
-    <div class="col-md-6"><label class="form-label">Foto do produto (URL HTTPS ou Google Drive, opcional)</label><input class="form-control" name="imagem_url" type="url" value="{{ produto.imagem_url if produto else '' }}" maxlength="500" placeholder="https://drive.google.com/file/d/.../view"><div class="form-text">Aceita PNG, JPG, WEBP e links públicos do Google Drive. No Drive, escolha “Qualquer pessoa com o link”; o sistema converte o link automaticamente.</div></div>
+    <div class="col-md-6"><label class="form-label" for="imagem-url">Foto do produto (URL HTTPS ou Google Drive, opcional)</label><input class="form-control" id="imagem-url" name="imagem_url" type="url" value="{{ produto.imagem_url if produto else '' }}" maxlength="500" placeholder="https://drive.google.com/file/d/.../view"><div class="form-text">Aceita PNG, JPG, WEBP e links públicos do Google Drive. No Drive, escolha “Qualquer pessoa com o link”; o sistema converte o link automaticamente.</div></div>
+    <div class="col-12"><section class="image-framing-editor" id="editor-enquadramento">
+      <div class="image-framing-preview" id="preview-imagem"><img id="imagem-preview" alt="Prévia da foto no cardápio"><span id="imagem-sem-preview">Cole uma foto para visualizar o enquadramento.</span></div>
+      <div class="image-framing-controls">
+        <div><div class="d-flex justify-content-between gap-3"><label class="form-label" for="imagem-posicao-x">Enquadramento horizontal</label><output id="valor-posicao-x">{{ produto.imagem_posicao_x if produto else 50 }}%</output></div><input class="form-range" id="imagem-posicao-x" name="imagem_posicao_x" type="range" min="0" max="100" step="1" value="{{ produto.imagem_posicao_x if produto else 50 }}"></div>
+        <div><div class="d-flex justify-content-between gap-3"><label class="form-label" for="imagem-posicao-y">Enquadramento vertical</label><output id="valor-posicao-y">{{ produto.imagem_posicao_y if produto else 50 }}%</output></div><input class="form-range" id="imagem-posicao-y" name="imagem_posicao_y" type="range" min="0" max="100" step="1" value="{{ produto.imagem_posicao_y if produto else 50 }}"></div>
+        <button class="btn btn-outline-secondary btn-sm" type="button" id="centralizar-imagem">Centralizar imagem</button>
+        <p class="form-text mb-0">A foto não é recortada nem enviada ao servidor: apenas escolhe qual parte aparece no cardápio.</p>
+      </div>
+    </section></div>
     <div class="col-md-6"><label class="form-label">Quantidade em estoque</label><input class="form-control" name="estoque" type="number" min="0" step="1" value="{{ produto.estoque if produto else 0 }}" required></div>
     <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="disponivel" id="disponivel" {% if not produto or produto.disponivel %}checked{% endif %}><label class="form-check-label" for="disponivel">Produto disponivel para venda</label></div></div>
 
@@ -48,6 +57,43 @@
       const botao = evento.target.closest('.remover-complemento');
       if (botao) botao.closest('.complemento-linha').remove();
     });
+
+    const urlImagem = document.getElementById('imagem-url');
+    const imagem = document.getElementById('imagem-preview');
+    const semPreview = document.getElementById('imagem-sem-preview');
+    const posicaoX = document.getElementById('imagem-posicao-x');
+    const posicaoY = document.getElementById('imagem-posicao-y');
+    const valorX = document.getElementById('valor-posicao-x');
+    const valorY = document.getElementById('valor-posicao-y');
+    function urlParaPreview(valor) {
+      try {
+        const url = new URL(valor);
+        if (!['drive.google.com', 'www.drive.google.com'].includes(url.hostname)) return valor;
+        const trecho = url.pathname.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
+        const id = trecho ? trecho[1] : url.searchParams.get('id');
+        if (!id) return valor;
+        const consulta = new URLSearchParams({id, sz: 'w1200'});
+        if (url.searchParams.get('resourcekey')) consulta.set('resourcekey', url.searchParams.get('resourcekey'));
+        return `https://drive.google.com/thumbnail?${consulta}`;
+      } catch (_) { return valor; }
+    }
+    function atualizarEnquadramento() {
+      imagem.style.objectPosition = `${posicaoX.value}% ${posicaoY.value}%`;
+      valorX.value = `${posicaoX.value}%`; valorX.textContent = `${posicaoX.value}%`;
+      valorY.value = `${posicaoY.value}%`; valorY.textContent = `${posicaoY.value}%`;
+    }
+    function atualizarPreview() {
+      const fonte = urlImagem.value.trim();
+      imagem.removeAttribute('src');
+      semPreview.hidden = !fonte;
+      if (fonte) imagem.src = urlParaPreview(fonte);
+    }
+    imagem.addEventListener('load', () => { semPreview.hidden = true; });
+    imagem.addEventListener('error', () => { semPreview.hidden = false; semPreview.textContent = 'Não foi possível carregar a imagem. Confira se o link é público.'; });
+    [posicaoX, posicaoY].forEach(campo => campo.addEventListener('input', atualizarEnquadramento));
+    urlImagem.addEventListener('input', atualizarPreview);
+    document.getElementById('centralizar-imagem').addEventListener('click', () => { posicaoX.value = 50; posicaoY.value = 50; atualizarEnquadramento(); });
+    atualizarEnquadramento(); atualizarPreview();
   })();
 </script>
 {% endblock %}

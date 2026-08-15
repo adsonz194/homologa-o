@@ -705,14 +705,16 @@ def atualizar_pagamento(venda_id, status, payment_id=None):
 
 def criar_produto(
     codigo_interno, ean, descricao, valor_unitario, estoque, disponivel,
-    categoria, imagem_url, estabelecimento_id,
+    categoria, imagem_url, imagem_posicao_x, imagem_posicao_y, estabelecimento_id,
 ):
     db = get_db()
     cursor = db.execute(
         """INSERT INTO produtos
-           (codigo_interno, ean, descricao, valor_unitario, estoque, disponivel, categoria, imagem_url, estabelecimento_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (codigo_interno, ean or None, descricao, valor_unitario, estoque, int(disponivel), categoria, imagem_url, estabelecimento_id),
+           (codigo_interno, ean, descricao, valor_unitario, estoque, disponivel, categoria, imagem_url,
+            imagem_posicao_x, imagem_posicao_y, estabelecimento_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (codigo_interno, ean or None, descricao, valor_unitario, estoque, int(disponivel), categoria, imagem_url,
+         imagem_posicao_x, imagem_posicao_y, estabelecimento_id),
     )
     db.commit()
     return cursor.lastrowid
@@ -720,15 +722,15 @@ def criar_produto(
 
 def atualizar_produto(
     produto_id, codigo_interno, ean, descricao, valor_unitario, estoque,
-    disponivel, categoria, imagem_url, estabelecimento_id,
+    disponivel, categoria, imagem_url, imagem_posicao_x, imagem_posicao_y, estabelecimento_id,
 ):
     db = get_db()
     db.execute(
         """UPDATE produtos SET codigo_interno = ?, ean = ?, descricao = ?, valor_unitario = ?, estoque = ?, disponivel = ?,
-           categoria = ?, imagem_url = ?
+           categoria = ?, imagem_url = ?, imagem_posicao_x = ?, imagem_posicao_y = ?
            WHERE id = ? AND estabelecimento_id = ?""",
         (codigo_interno, ean or None, descricao, valor_unitario, estoque, int(disponivel), categoria, imagem_url,
-         produto_id, estabelecimento_id),
+         imagem_posicao_x, imagem_posicao_y, produto_id, estabelecimento_id),
     )
     db.commit()
 

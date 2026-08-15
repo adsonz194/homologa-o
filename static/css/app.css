@@ -120,6 +120,12 @@ body.app-body {
 .food-add-button:hover, .food-add-button:focus { color: #fff; border-color: var(--food-dark); background: var(--food-dark); }
 .food-add-button:disabled { color: #fff; border-color: #c7c7c7; background: #c7c7c7; }
 .complementos-editor { padding: 1rem; border: 1px solid var(--line); border-radius: 14px; background: #fbfcff; }
+.image-framing-editor { display: grid; grid-template-columns: minmax(220px, 320px) minmax(0, 1fr); gap: 20px; align-items: center; padding: 1rem; border: 1px solid var(--line); border-radius: 14px; background: #fbfcff; }
+.image-framing-preview { position: relative; display: grid; min-height: 172px; place-items: center; overflow: hidden; border: 1px dashed #cbd5e1; border-radius: 12px; color: var(--muted); background: #f1f5f9; text-align: center; }
+.image-framing-preview img { width: 100%; height: 172px; object-fit: cover; object-position: 50% 50%; }
+.image-framing-preview span { padding: 1rem; font-size: .82rem; }
+.image-framing-controls { display: grid; gap: 12px; }
+.image-framing-controls output { color: var(--brand); font-size: .82rem; font-weight: 800; }
 .complemento-linha { padding: .72rem 0; }
 .complemento-linha + .complemento-linha { border-top: 1px solid #e9edf5; }
 .summary-card { position: sticky; top: 86px; }
@@ -245,6 +251,7 @@ body.app-body {
   .food-product-card .card-body { min-height: 0; padding: 1rem; }
   .food-add-actions .form-control { width: 66px; }
   .complementos-editor { padding: .85rem; }
+  .image-framing-editor { grid-template-columns: 1fr; gap: 14px; padding: .85rem; }
   .complemento-linha { padding: .55rem 0 .85rem; }
   .summary-card { position: static; }
   .table-responsive { overflow: visible; }

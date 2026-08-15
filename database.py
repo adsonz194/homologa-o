@@ -76,6 +76,8 @@ def init_db():
         valor_unitario REAL NOT NULL CHECK(valor_unitario > 0),
         categoria TEXT NOT NULL DEFAULT 'Geral',
         imagem_url TEXT NOT NULL DEFAULT '',
+        imagem_posicao_x REAL NOT NULL DEFAULT 50,
+        imagem_posicao_y REAL NOT NULL DEFAULT 50,
         criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )""")
     db.execute("""CREATE TABLE IF NOT EXISTS produto_complementos (
@@ -311,6 +313,10 @@ def init_db():
         db.execute("ALTER TABLE produtos ADD COLUMN categoria TEXT NOT NULL DEFAULT 'Geral'")
     if "imagem_url" not in colunas_produtos:
         db.execute("ALTER TABLE produtos ADD COLUMN imagem_url TEXT NOT NULL DEFAULT ''")
+    if "imagem_posicao_x" not in colunas_produtos:
+        db.execute("ALTER TABLE produtos ADD COLUMN imagem_posicao_x REAL NOT NULL DEFAULT 50")
+    if "imagem_posicao_y" not in colunas_produtos:
+        db.execute("ALTER TABLE produtos ADD COLUMN imagem_posicao_y REAL NOT NULL DEFAULT 50")
     colunas_pedidos = {coluna["name"] for coluna in db.execute("PRAGMA table_info(pedidos)")}
     if "status_operacional" not in colunas_pedidos:
         db.execute("ALTER TABLE pedidos ADD COLUMN status_operacional TEXT NOT NULL DEFAULT 'PENDENTE'")

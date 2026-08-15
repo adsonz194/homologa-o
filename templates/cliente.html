@@ -30,7 +30,7 @@
       {% for produto in itens_categoria %}
         {% set complementos = complementos_por_produto[produto.id] %}
         <div class="col-sm-6 col-lg-4"><article class="card food-product-card h-100">
-          {% if produto.imagem_url %}<img src="{{ produto.imagem_url }}" class="card-img-top" alt="{{ produto.descricao }}" loading="lazy" style="height: 172px; object-fit: cover">{% endif %}
+          {% if produto.imagem_url %}<img src="{{ produto.imagem_url }}" class="card-img-top" alt="{{ produto.descricao }}" loading="lazy" style="height: 172px; object-fit: cover; object-position: {{ produto.imagem_posicao_x }}% {{ produto.imagem_posicao_y }}%">{% endif %}
           <div class="card-body">
             <div class="food-product-top"><div><h2>{{ produto.descricao }}</h2><p>{{ categoria }}</p></div>{% if not produto.imagem_url %}<span class="food-product-icon" aria-hidden="true">&#127869;</span>{% endif %}</div>
             <p class="food-product-price">R$ {{ '%.2f'|format(produto.valor_unitario) }}</p>
