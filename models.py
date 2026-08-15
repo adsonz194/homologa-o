@@ -3,7 +3,7 @@ import hashlib
 import hmac
 import re
 import secrets
-from datetime import datetime, time
+from datetime import datetime, time, timedelta, timezone
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
@@ -26,6 +26,36 @@ DIAS_SEMANA = (
 )
 def data_hora_loja():
     return datetime.now(FUSO_HORARIO_LOJA)
+
+
+def _intervalo_utc_para_datas_locais(data_inicio, data_fim):
+    """Converte um intervalo de datas da loja para o intervalo UTC do SQLite.
+
+    O SQLite grava CURRENT_TIMESTAMP em UTC. Fazer date(criado_em) diretamente
+    fazia vendas noturnas de Brasilia aparecerem no dia seguinte.
+    """
+    inicio_local = datetime.combine(
+        datetime.fromisoformat(str(data_inicio)).date(), time.min, FUSO_HORARIO_LOJA
+    )
+    fim_local = datetime.combine(
+        datetime.fromisoformat(str(data_fim)).date() + timedelta(days=1), time.min, FUSO_HORARIO_LOJA
+    )
+    formato = "%Y-%m-%d %H:%M:%S"
+    return (
+        inicio_local.astimezone(timezone.utc).strftime(formato),
+        fim_local.astimezone(timezone.utc).strftime(formato),
+    )
+
+
+def _formatar_data_hora_loja(valor):
+    """Exibe timestamps UTC do banco no fuso configurado da loja."""
+    try:
+        utc = datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
+        if utc.tzinfo is None:
+            utc = utc.replace(tzinfo=timezone.utc)
+        return utc.astimezone(FUSO_HORARIO_LOJA).strftime("%d/%m/%Y %H:%M")
+    except (TypeError, ValueError):
+        return str(valor or "-")
 
 
 def status_funcionamento_estabelecimento(estabelecimento, agora=None):
@@ -396,27 +426,40 @@ def obter_venda(venda_id, estabelecimento_id=None):
 
 
 def listar_vendas(estabelecimento_id):
-    return get_db().execute("SELECT * FROM vendas WHERE estabelecimento_id = ? ORDER BY id DESC", (estabelecimento_id,)).fetchall()
+    vendas = get_db().execute(
+        "SELECT * FROM vendas WHERE estabelecimento_id = ? ORDER BY id DESC", (estabelecimento_id,)
+    ).fetchall()
+    resultado = []
+    for venda in vendas:
+        linha = dict(venda)
+        linha["criado_em_local"] = _formatar_data_hora_loja(venda["criado_em"])
+        resultado.append(linha)
+    return resultado
 
 
 def relatorio_vendas(estabelecimento_id, data_inicio, data_fim):
     """Itens de venda interna e delivery para o relatorio imprimivel."""
+    inicio_utc, fim_utc = _intervalo_utc_para_datas_locais(data_inicio, data_fim)
     linhas = get_db().execute(
         """SELECT 'INTERNA' AS canal, id, cliente,
                   produto || ' × ' || quantidade AS descricao, forma_pagamento,
                   valor_total, status_pagamento, criado_em
            FROM vendas
-           WHERE estabelecimento_id = ? AND date(criado_em) BETWEEN date(?) AND date(?)
+           WHERE estabelecimento_id = ? AND criado_em >= ? AND criado_em < ?
            UNION ALL
            SELECT 'DELIVERY' AS canal, pedidos.id, pedidos.cliente,
                   COALESCE(GROUP_CONCAT(pedido_itens.quantidade || ' × ' || pedido_itens.descricao, ', '), ''),
                   pedidos.forma_pagamento, pedidos.valor_total, pedidos.status_pagamento, pedidos.criado_em
            FROM pedidos LEFT JOIN pedido_itens ON pedido_itens.pedido_id = pedidos.id
-           WHERE pedidos.estabelecimento_id = ? AND date(pedidos.criado_em) BETWEEN date(?) AND date(?)
+           WHERE pedidos.estabelecimento_id = ? AND pedidos.criado_em >= ? AND pedidos.criado_em < ?
            GROUP BY pedidos.id
            ORDER BY criado_em DESC, canal""",
-        (estabelecimento_id, data_inicio, data_fim, estabelecimento_id, data_inicio, data_fim),
+        (estabelecimento_id, inicio_utc, fim_utc, estabelecimento_id, inicio_utc, fim_utc),
     ).fetchall()
+    linhas = [
+        {**dict(linha), "criado_em": _formatar_data_hora_loja(linha["criado_em"])}
+        for linha in linhas
+    ]
     resumo = {
         "quantidade": len(linhas),
         "aprovadas": sum(1 for linha in linhas if linha["status_pagamento"] == "APROVADO"),
