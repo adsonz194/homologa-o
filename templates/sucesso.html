@@ -5,6 +5,7 @@
   <h1 class="h3">Venda #{{ venda.id }}</h1>
   <p><strong>Cliente:</strong> {{ venda.cliente }}</p><p><strong>Produto:</strong> {{ venda.produto }} &times; {{ venda.quantidade }}</p>
   <p><strong>Total:</strong> R$ {{ '%.2f'|format(venda.valor_total) }}</p><p><strong>Status:</strong> <span id="status-pagamento">{{ venda.status_pagamento }}</span></p>
+  {% if venda.forma_pagamento == 'POINT' and venda.point_order_id %}<p><strong>ID da cobranca Point:</strong> <code>{{ venda.point_order_id }}</code></p>{% endif %}
   {% if venda.forma_pagamento == 'POINT' %}<div class="alert alert-info" id="aviso-point"><strong>Cobranca Point:</strong> aguardando a resposta da maquininha. Esta pagina atualiza o status automaticamente.</div>{% endif %}
   <div class="d-flex flex-wrap gap-2">
     <a class="btn btn-outline-secondary" href="{{ url_for('vendas.comprovante_pdf', venda_id=venda.id) }}">Baixar cupom 80 mm</a>
