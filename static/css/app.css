@@ -189,6 +189,9 @@ body.app-body {
 .pos-summary-card .form-control, .pos-summary-card .input-group-text { border-color: transparent; background: #fff; }
 .pos-summary-card .input-group-text { color: #4b5563; font-size: .78rem; }
 .pos-number-input { text-align: center; font-weight: 800; }
+.pos-cash-details { margin-top: 15px; padding: 11px; border: 1px solid rgba(255,255,255,.16); border-radius: 12px; background: rgba(10,15,62,.22); }
+.pos-cash-details .form-label { margin-bottom: .35rem; }
+.pos-cash-change { min-height: 18px; margin: 8px 0 0; color: #d8def7; font-size: .75rem; font-weight: 700; }
 .pos-total-row { display: flex; align-items: end; justify-content: space-between; gap: 10px; margin: 25px 0 17px; padding-top: 18px; border-top: 1px dashed rgba(255,255,255,.25); color: #d8def7; font-size: .83rem; }
 .pos-total-row strong { color: #fff; font-size: 1.72rem; font-weight: 850; letter-spacing: -.06em; white-space: nowrap; }
 .pos-submit { display: flex; width: 100%; min-height: 54px; align-items: center; justify-content: space-between; border: 0; color: #fff; background: #0da56f; box-shadow: 0 10px 20px rgba(0, 0, 0, .19); }

@@ -29,6 +29,7 @@
   <div class="line"></div>
   {% if venda.desconto %}<div class="sale"><span>Desconto</span><span>- R$ {{ '%.2f'|format(venda.desconto) }}</span></div>{% endif %}
   <div class="total"><span>TOTAL</span><span>R$ {{ '%.2f'|format(venda.valor_total) }}</span></div>
+  {% if venda.forma_pagamento == 'DINHEIRO' %}<div class="sale"><span>Valor recebido</span><span>R$ {{ '%.2f'|format(venda.valor_recebido or 0) }}</span></div><div class="sale"><span>Troco</span><span>R$ {{ '%.2f'|format(venda.troco or 0) }}</span></div>{% endif %}
   <div><strong>PAGAMENTO:</strong> {{ 'CARTÃO - POINT' if venda.forma_pagamento == 'POINT' else venda.forma_pagamento }}</div>
   <div><strong>STATUS:</strong> {{ venda.status_pagamento }}</div>
   {% if venda.point_order_id %}<div class="muted">Ordem Point: {{ venda.point_order_id }}</div>{% endif %}

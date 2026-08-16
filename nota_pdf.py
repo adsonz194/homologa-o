@@ -288,6 +288,11 @@ def gerar_comprovante_venda_pdf(venda, estabelecimento, itens=None):
     totais = []
     if float(venda["desconto"] or 0) > 0:
         totais.append([Paragraph("Desconto", normal), Paragraph(f"- {moeda(venda['desconto'])}", direita)])
+    if venda["forma_pagamento"] == "DINHEIRO":
+        totais.extend([
+            [Paragraph("Valor recebido", normal), Paragraph(moeda(venda["valor_recebido"]), direita)],
+            [Paragraph("Troco", normal), Paragraph(moeda(venda["troco"]), direita)],
+        ])
     totais.append([Paragraph("<b>Total da venda</b>", normal), Paragraph(f"<b>{moeda(venda['valor_total'])}</b>", direita)])
     tabela_totais = Table(totais, colWidths=[47 * mm, 23 * mm])
     tabela_totais.setStyle(TableStyle([

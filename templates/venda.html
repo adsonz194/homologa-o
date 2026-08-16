@@ -76,6 +76,11 @@
             <div class="input-group"><span class="input-group-text">R$</span><input class="form-control" id="desconto" name="desconto" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div>
           </div>
         </div>
+        <div class="pos-cash-details" id="detalhes-dinheiro">
+          <label class="form-label" for="valor-recebido">Valor recebido em dinheiro</label>
+          <div class="input-group"><span class="input-group-text">R$</span><input class="form-control" id="valor-recebido" name="valor_recebido" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00"></div>
+          <p class="pos-cash-change" id="troco-dinheiro">Informe o valor entregue pelo cliente para calcular o troco.</p>
+        </div>
         <div class="pos-total-row"><span>Valor deste item</span><strong id="total-venda">R$ 0,00</strong></div>
         <button class="btn btn-success pos-submit" name="acao" value="ADICIONAR" type="submit"><span>Adicionar ao ticket</span><span aria-hidden="true">+</span></button>
         <button class="btn pos-charge-submit" name="acao" value="COBRAR" type="submit"><span id="texto-cobrar">Adicionar e cobrar agora</span><span aria-hidden="true">→</span></button>
@@ -91,6 +96,9 @@
   const valor = document.getElementById('valor-unitario');
   const quantidade = document.getElementById('quantidade');
   const desconto = document.getElementById('desconto');
+  const valorRecebido = document.getElementById('valor-recebido');
+  const detalhesDinheiro = document.getElementById('detalhes-dinheiro');
+  const trocoDinheiro = document.getElementById('troco-dinheiro');
   const resultados = document.getElementById('resultados-produto');
   const selecionado = document.getElementById('produto-selecionado');
   const resumoProduto = document.getElementById('resumo-produto');
@@ -99,7 +107,12 @@
   let temporizador, controlador;
   const numero = campo => Number(String(campo.value || '0').replace(',', '.')) || 0;
   const moeda = valor => valor.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
-  function atualizarResumo() { totalVenda.textContent = moeda(Math.max(0, numero(valor) * Math.max(0, numero(quantidade)))); }
+  function atualizarResumo() {
+    const total = Math.max(0, numero(valor) * Math.max(0, numero(quantidade)) - numero(desconto));
+    totalVenda.textContent = moeda(total);
+    const troco = numero(valorRecebido) - total;
+    trocoDinheiro.textContent = valorRecebido.value ? (troco >= 0 ? `Troco: ${moeda(troco)}` : `Faltam ${moeda(Math.abs(troco))}`) : 'Informe o valor entregue pelo cliente para calcular o troco.';
+  }
   function limparResultados() { resultados.replaceChildren(); }
   function selecionar(produto) {
     produtoId.value = produto.id; busca.value = produto.descricao; valor.value = Number(produto.valor_unitario).toFixed(2);
@@ -129,15 +142,22 @@
       } catch (erro) { if (erro.name !== 'AbortError') selecionado.textContent = 'Não foi possível pesquisar os produtos.'; }
     }, 180);
   });
-  [quantidade, desconto].forEach(campo => campo.addEventListener('input', atualizarResumo));
-  document.getElementById('form-venda').addEventListener('submit', evento => { if (!produtoId.value) { evento.preventDefault(); busca.focus(); selecionado.textContent = 'Selecione um produto do cadastro antes de continuar.'; } });
+  [quantidade, desconto, valorRecebido].forEach(campo => campo.addEventListener('input', atualizarResumo));
+  document.getElementById('form-venda').addEventListener('submit', evento => {
+    if (!produtoId.value) { evento.preventDefault(); busca.focus(); selecionado.textContent = 'Selecione um produto do cadastro antes de continuar.'; return; }
+    const cobrando = evento.submitter && evento.submitter.value === 'COBRAR';
+    const dinheiro = document.querySelector('input[name="forma_pagamento"]:checked').value === 'DINHEIRO';
+    if (cobrando && dinheiro && (!valorRecebido.value || numero(valorRecebido) < Math.max(0, numero(valor) * numero(quantidade) - numero(desconto)))) { evento.preventDefault(); valorRecebido.focus(); trocoDinheiro.textContent = 'Informe um valor igual ou maior que o total para fechar em dinheiro.'; }
+  });
   const ajudaPagamento = document.getElementById('ajuda-pagamento'); const textoCobrar = document.getElementById('texto-cobrar');
   document.querySelectorAll('input[name="forma_pagamento"]').forEach(campo => campo.addEventListener('change', () => {
     const point = document.querySelector('input[name="forma_pagamento"]:checked').value === 'POINT';
+    detalhesDinheiro.hidden = point;
     ajudaPagamento.textContent = point ? 'Ao cobrar agora, a cobrança será enviada à maquininha Point.' : 'Ao cobrar agora, o ticket será registrado como pago em dinheiro.';
     textoCobrar.textContent = point ? 'Adicionar e enviar à maquininha' : 'Adicionar e receber em dinheiro';
   }));
   window.addEventListener('keydown', evento => { if (evento.key === 'F2') { evento.preventDefault(); busca.focus(); } if (evento.key === 'F4') { evento.preventDefault(); quantidade.focus(); quantidade.select(); } });
   atualizarResumo();
+  detalhesDinheiro.hidden = false;
 </script>
 {% endblock %}

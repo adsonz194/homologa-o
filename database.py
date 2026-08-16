@@ -65,6 +65,8 @@ def init_db():
         desconto REAL NOT NULL DEFAULT 0 CHECK(desconto >= 0), valor_total REAL NOT NULL,
         forma_pagamento TEXT NOT NULL, status_pagamento TEXT NOT NULL DEFAULT 'PENDENTE',
         preference_id TEXT, payment_id TEXT, point_order_id TEXT,
+        valor_recebido REAL,
+        troco REAL NOT NULL DEFAULT 0,
         status_venda TEXT NOT NULL DEFAULT 'FECHADA',
         atualizado_em TEXT,
         criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
@@ -298,6 +300,10 @@ def init_db():
         db.execute("ALTER TABLE vendas ADD COLUMN estabelecimento_id INTEGER")
     if "point_order_id" not in colunas_vendas:
         db.execute("ALTER TABLE vendas ADD COLUMN point_order_id TEXT")
+    if "valor_recebido" not in colunas_vendas:
+        db.execute("ALTER TABLE vendas ADD COLUMN valor_recebido REAL")
+    if "troco" not in colunas_vendas:
+        db.execute("ALTER TABLE vendas ADD COLUMN troco REAL NOT NULL DEFAULT 0")
     if "status_venda" not in colunas_vendas:
         db.execute("ALTER TABLE vendas ADD COLUMN status_venda TEXT NOT NULL DEFAULT 'FECHADA'")
     if "atualizado_em" not in colunas_vendas:

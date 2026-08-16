@@ -6,6 +6,7 @@
   <p><strong>Cliente/Mesa:</strong> {{ venda.cliente }}</p>
   {% if itens %}<div class="mb-3"><strong>Itens:</strong><ul class="mb-0 mt-1">{% for item in itens %}<li>{{ item.descricao }} &times; {{ item.quantidade }} — R$ {{ '%.2f'|format(item.quantidade * item.valor_unitario) }}</li>{% endfor %}</ul></div>{% else %}<p><strong>Produto:</strong> {{ venda.produto }} &times; {{ venda.quantidade }}</p>{% endif %}
   <p><strong>Total:</strong> R$ {{ '%.2f'|format(venda.valor_total) }}</p><p><strong>Status:</strong> <span id="status-pagamento">{{ venda.status_pagamento }}</span></p>
+  {% if venda.forma_pagamento == 'DINHEIRO' %}<p><strong>Valor recebido:</strong> R$ {{ '%.2f'|format(venda.valor_recebido or 0) }}</p><p><strong>Troco:</strong> R$ {{ '%.2f'|format(venda.troco or 0) }}</p>{% endif %}
   {% if venda.forma_pagamento == 'POINT' and venda.point_order_id %}<p><strong>ID da cobranca Point:</strong> <code>{{ venda.point_order_id }}</code></p>{% endif %}
   {% if venda.forma_pagamento == 'POINT' %}<div class="alert alert-info" id="aviso-point"><strong>Cobranca Point:</strong> aguardando a resposta da maquininha. Esta pagina atualiza o status automaticamente.</div>{% endif %}
   <div class="d-flex flex-wrap gap-2">

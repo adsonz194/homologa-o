@@ -31,6 +31,11 @@ def _valor_monetario(valor):
     return float(Decimal(str(valor or "0").replace(",", ".")))
 
 
+def _valor_monetario_opcional(valor):
+    texto = str(valor or "").strip()
+    return _valor_monetario(texto) if texto else None
+
+
 def _pagina_iniciar_pagamento(venda):
     point = venda["forma_pagamento"] == "POINT"
     return render_template(
@@ -112,6 +117,7 @@ def nova_venda():
         forma = request.form.get("forma_pagamento", "DINHEIRO")
         acao = request.form.get("acao", "ADICIONAR")
         desconto = _valor_monetario(request.form.get("desconto", "0"))
+        valor_recebido = _valor_monetario_opcional(request.form.get("valor_recebido"))
         produto = obter_produto(produto_id, g.usuario["estabelecimento_id"])
         if not cliente or produto is None or forma not in FORMAS_PAGAMENTO or acao not in {"ADICIONAR", "COBRAR"} or desconto < 0:
             raise ValueError
@@ -124,7 +130,7 @@ def nova_venda():
         venda = adicionar_item_comanda(venda_id, produto_id, quantidade, g.usuario["estabelecimento_id"])
         if acao == "COBRAR":
             venda = preparar_comanda_para_pagamento(
-                venda_id, forma, desconto, g.usuario["estabelecimento_id"]
+                venda_id, forma, desconto, g.usuario["estabelecimento_id"], valor_recebido
             )
             return _concluir_cobranca(venda)
     except (EstoqueInsuficiente, ValueError) as erro:
@@ -175,10 +181,11 @@ def fechar_comanda(venda_id):
     try:
         forma = request.form["forma_pagamento"]
         desconto = _valor_monetario(request.form.get("desconto", "0"))
+        valor_recebido = _valor_monetario_opcional(request.form.get("valor_recebido"))
         if forma not in FORMAS_PAGAMENTO:
             raise ValueError
         venda = preparar_comanda_para_pagamento(
-            venda_id, forma, desconto, g.usuario["estabelecimento_id"]
+            venda_id, forma, desconto, g.usuario["estabelecimento_id"], valor_recebido
         )
         return _concluir_cobranca(venda)
     except (KeyError, ValueError, InvalidOperation, EstoqueInsuficiente) as erro:

@@ -64,7 +64,7 @@
       <div class="card-body">
         <div class="pos-summary-heading"><div><span>CONTA DA MESA</span><h2>Ticket #{{ venda.id }}</h2></div><span class="pos-live-dot">● Aberto</span></div>
         <div class="comanda-summary-client"><span>Atendimento</span><strong>{{ venda.cliente }}</strong></div>
-        <div class="pos-total-row"><span>Subtotal</span><strong>R$ {{ '%.2f'|format(venda.valor_total) }}</strong></div>
+        <div class="pos-total-row"><span>Total a cobrar</span><strong id="total-comanda">R$ {{ '%.2f'|format(venda.valor_total) }}</strong></div>
         <form method="post" action="{{ url_for('vendas.fechar_comanda', venda_id=venda.id) }}" id="form-fechar-comanda">
           <label class="form-label" for="desconto">Desconto</label>
           <div class="input-group mb-3"><span class="input-group-text">R$</span><input class="form-control" id="desconto" name="desconto" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div>
@@ -72,6 +72,11 @@
           <div class="pos-payment-grid pos-payment-grid-compact" role="radiogroup" aria-label="Forma de pagamento">
             <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-point" value="POINT"><label class="pos-payment-option" for="pagamento-point"><span>Maquininha</span></label>
             <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-dinheiro" value="DINHEIRO" checked><label class="pos-payment-option" for="pagamento-dinheiro"><span>Dinheiro</span></label>
+          </div>
+          <div class="pos-cash-details" id="detalhes-dinheiro">
+            <label class="form-label mt-3" for="valor-recebido">Valor recebido em dinheiro</label>
+            <div class="input-group"><span class="input-group-text">R$</span><input class="form-control" id="valor-recebido" name="valor_recebido" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00"></div>
+            <p class="pos-cash-change" id="troco-dinheiro">Informe o valor entregue pelo cliente para calcular o troco.</p>
           </div>
           <p class="form-text comanda-payment-help" id="ajuda-pagamento">O ticket será registrado como pago em dinheiro.</p>
           <button class="btn pos-charge-submit" type="submit"><span id="texto-fechar">Fechar e receber em dinheiro</span><span aria-hidden="true">→</span></button>
@@ -88,6 +93,12 @@
   const resultados = document.getElementById('resultados-produto');
   const selecionado = document.getElementById('produto-selecionado');
   const valor = document.getElementById('valor-unitario');
+  const descontoComanda = document.getElementById('desconto');
+  const totalComanda = document.getElementById('total-comanda');
+  const valorRecebido = document.getElementById('valor-recebido');
+  const detalhesDinheiro = document.getElementById('detalhes-dinheiro');
+  const trocoDinheiro = document.getElementById('troco-dinheiro');
+  const subtotalComanda = Number({{ venda.valor_total|tojson }});
   let temporizador, controlador;
   function limparResultados() { resultados.replaceChildren(); }
   function selecionar(produto) { produtoId.value = produto.id; busca.value = produto.descricao; valor.textContent = Number(produto.valor_unitario).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}); selecionado.textContent = `Selecionado: ${produto.descricao} | Interno: ${produto.codigo_interno}${produto.ean ? ' | EAN: ' + produto.ean : ''}`; limparResultados(); quantidade.focus(); }
@@ -95,7 +106,14 @@
   busca.addEventListener('input', () => { produtoId.value = ''; valor.textContent = 'R$ 0,00'; selecionado.textContent = 'Escolha um produto cadastrado na lista.'; clearTimeout(temporizador); limparResultados(); const consulta = busca.value.trim(); if (!consulta) return; temporizador = setTimeout(async () => { if (controlador) controlador.abort(); controlador = new AbortController(); try { const resposta = await fetch(`/api/produtos/buscar?q=${encodeURIComponent(consulta)}`, {signal: controlador.signal}); const itens = await resposta.json(); const exato = itens.find(p => p.ean === consulta || p.codigo_interno.toLowerCase() === consulta.toLowerCase()); if (exato) selecionar(exato); else mostrarResultados(itens); } catch (erro) { if (erro.name !== 'AbortError') selecionado.textContent = 'Não foi possível pesquisar os produtos.'; } }, 180); });
   document.getElementById('form-item-comanda').addEventListener('submit', evento => { if (!produtoId.value) { evento.preventDefault(); busca.focus(); selecionado.textContent = 'Selecione um produto antes de adicionar.'; } });
   const ajuda = document.getElementById('ajuda-pagamento'); const textoFechar = document.getElementById('texto-fechar');
-  document.querySelectorAll('input[name="forma_pagamento"]').forEach(campo => campo.addEventListener('change', () => { const point = document.querySelector('input[name="forma_pagamento"]:checked').value === 'POINT'; ajuda.textContent = point ? 'A cobrança da conta inteira será enviada à maquininha Point.' : 'O ticket será registrado como pago em dinheiro.'; textoFechar.textContent = point ? 'Fechar e enviar à maquininha' : 'Fechar e receber em dinheiro'; }));
+  const moeda = valor => valor.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+  const numero = campo => Number(String(campo.value || '0').replace(',', '.')) || 0;
+  function atualizarTotaisComanda() { const total = Math.max(0, subtotalComanda - numero(descontoComanda)); totalComanda.textContent = moeda(total); const troco = numero(valorRecebido) - total; trocoDinheiro.textContent = valorRecebido.value ? (troco >= 0 ? `Troco: ${moeda(troco)}` : `Faltam ${moeda(Math.abs(troco))}`) : 'Informe o valor entregue pelo cliente para calcular o troco.'; }
+  function atualizarFormaPagamento() { const point = document.querySelector('input[name="forma_pagamento"]:checked').value === 'POINT'; detalhesDinheiro.hidden = point; ajuda.textContent = point ? 'A cobrança da conta inteira será enviada à maquininha Point.' : 'O ticket será registrado como pago em dinheiro.'; textoFechar.textContent = point ? 'Fechar e enviar à maquininha' : 'Fechar e receber em dinheiro'; }
+  document.querySelectorAll('input[name="forma_pagamento"]').forEach(campo => campo.addEventListener('change', atualizarFormaPagamento));
+  [descontoComanda, valorRecebido].forEach(campo => campo.addEventListener('input', atualizarTotaisComanda));
+  document.getElementById('form-fechar-comanda').addEventListener('submit', evento => { const point = document.querySelector('input[name="forma_pagamento"]:checked').value === 'POINT'; const total = Math.max(0, subtotalComanda - numero(descontoComanda)); if (!point && (!valorRecebido.value || numero(valorRecebido) < total)) { evento.preventDefault(); valorRecebido.focus(); trocoDinheiro.textContent = 'Informe um valor igual ou maior que o total para fechar em dinheiro.'; } });
   window.addEventListener('keydown', evento => { if (evento.key === 'F2') { evento.preventDefault(); busca.focus(); } if (evento.key === 'F4') { evento.preventDefault(); quantidade.focus(); quantidade.select(); } });
+  atualizarFormaPagamento(); atualizarTotaisComanda();
 </script>
 {% endblock %}

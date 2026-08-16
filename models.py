@@ -554,7 +554,9 @@ def remover_item_comanda(venda_id, item_id, estabelecimento_id):
     return True
 
 
-def preparar_comanda_para_pagamento(venda_id, forma_pagamento, desconto, estabelecimento_id):
+def preparar_comanda_para_pagamento(
+    venda_id, forma_pagamento, desconto, estabelecimento_id, valor_recebido=None,
+):
     """Fecha a inclusao de itens e prepara a comanda para Checkout ou Point."""
     db = get_db()
     with db:
@@ -573,13 +575,21 @@ def preparar_comanda_para_pagamento(venda_id, forma_pagamento, desconto, estabel
             ).fetchone()
             if produto is None or not produto["disponivel"] or produto["estoque"] < item["quantidade"]:
                 raise EstoqueInsuficiente(f"Estoque insuficiente para {item['descricao']}.")
+        total = round(subtotal - desconto, 2)
+        if forma_pagamento == "DINHEIRO":
+            if valor_recebido is None or valor_recebido < total:
+                raise ValueError("Informe um valor em dinheiro igual ou maior que o total da venda.")
+            troco = round(valor_recebido - total, 2)
+        else:
+            valor_recebido = None
+            troco = 0
         db.execute(
             """UPDATE vendas
                SET desconto = ?, valor_total = ?, forma_pagamento = ?,
                    status_pagamento = 'PENDENTE', status_venda = 'AGUARDANDO_PAGAMENTO',
-                   atualizado_em = CURRENT_TIMESTAMP
+                   valor_recebido = ?, troco = ?, atualizado_em = CURRENT_TIMESTAMP
                WHERE id = ?""",
-            (desconto, subtotal - desconto, forma_pagamento, venda_id),
+            (desconto, total, forma_pagamento, valor_recebido, troco, venda_id),
         )
     return obter_venda(venda_id, estabelecimento_id)
 
