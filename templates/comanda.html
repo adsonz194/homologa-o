@@ -70,13 +70,11 @@
           <div class="input-group mb-3"><span class="input-group-text">R$</span><input class="form-control" id="desconto" name="desconto" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div>
           <label class="form-label">Forma de pagamento</label>
           <div class="pos-payment-grid pos-payment-grid-compact" role="radiogroup" aria-label="Forma de pagamento">
-            <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-pix" value="PIX" checked><label class="pos-payment-option" for="pagamento-pix"><span>Pix</span></label>
-            <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-credito" value="CREDITO"><label class="pos-payment-option" for="pagamento-credito"><span>Crédito</span></label>
-            <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-debito" value="DEBITO"><label class="pos-payment-option" for="pagamento-debito"><span>Débito</span></label>
-            <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-point" value="POINT"><label class="pos-payment-option" for="pagamento-point"><span>Point</span></label>
+            <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-point" value="POINT"><label class="pos-payment-option" for="pagamento-point"><span>Maquininha</span></label>
+            <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-dinheiro" value="DINHEIRO" checked><label class="pos-payment-option" for="pagamento-dinheiro"><span>Dinheiro</span></label>
           </div>
-          <p class="form-text comanda-payment-help" id="ajuda-pagamento">O checkout do Mercado Pago será aberto para a conta inteira.</p>
-          <button class="btn pos-charge-submit" type="submit"><span id="texto-fechar">Fechar e abrir checkout</span><span aria-hidden="true">→</span></button>
+          <p class="form-text comanda-payment-help" id="ajuda-pagamento">O ticket será registrado como pago em dinheiro.</p>
+          <button class="btn pos-charge-submit" type="submit"><span id="texto-fechar">Fechar e receber em dinheiro</span><span aria-hidden="true">→</span></button>
         </form>
         <p class="pos-shortcuts"><kbd>F2</kbd> produto <kbd>F4</kbd> quantidade</p>
       </div>
@@ -97,7 +95,7 @@
   busca.addEventListener('input', () => { produtoId.value = ''; valor.textContent = 'R$ 0,00'; selecionado.textContent = 'Escolha um produto cadastrado na lista.'; clearTimeout(temporizador); limparResultados(); const consulta = busca.value.trim(); if (!consulta) return; temporizador = setTimeout(async () => { if (controlador) controlador.abort(); controlador = new AbortController(); try { const resposta = await fetch(`/api/produtos/buscar?q=${encodeURIComponent(consulta)}`, {signal: controlador.signal}); const itens = await resposta.json(); const exato = itens.find(p => p.ean === consulta || p.codigo_interno.toLowerCase() === consulta.toLowerCase()); if (exato) selecionar(exato); else mostrarResultados(itens); } catch (erro) { if (erro.name !== 'AbortError') selecionado.textContent = 'Não foi possível pesquisar os produtos.'; } }, 180); });
   document.getElementById('form-item-comanda').addEventListener('submit', evento => { if (!produtoId.value) { evento.preventDefault(); busca.focus(); selecionado.textContent = 'Selecione um produto antes de adicionar.'; } });
   const ajuda = document.getElementById('ajuda-pagamento'); const textoFechar = document.getElementById('texto-fechar');
-  document.querySelectorAll('input[name="forma_pagamento"]').forEach(campo => campo.addEventListener('change', () => { const point = document.querySelector('input[name="forma_pagamento"]:checked').value === 'POINT'; ajuda.textContent = point ? 'A cobrança da conta inteira será enviada à maquininha Point.' : 'O checkout do Mercado Pago será aberto para a conta inteira.'; textoFechar.textContent = point ? 'Fechar e enviar ao Point' : 'Fechar e abrir checkout'; }));
+  document.querySelectorAll('input[name="forma_pagamento"]').forEach(campo => campo.addEventListener('change', () => { const point = document.querySelector('input[name="forma_pagamento"]:checked').value === 'POINT'; ajuda.textContent = point ? 'A cobrança da conta inteira será enviada à maquininha Point.' : 'O ticket será registrado como pago em dinheiro.'; textoFechar.textContent = point ? 'Fechar e enviar à maquininha' : 'Fechar e receber em dinheiro'; }));
   window.addEventListener('keydown', evento => { if (evento.key === 'F2') { evento.preventDefault(); busca.focus(); } if (evento.key === 'F4') { evento.preventDefault(); quantidade.focus(); quantidade.select(); } });
 </script>
 {% endblock %}

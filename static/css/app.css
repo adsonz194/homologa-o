@@ -168,6 +168,7 @@ body.app-body {
 .pos-product-result strong { display: block; color: var(--ink); }
 .pos-product-result small { display: block; margin-top: 3px; color: var(--muted); }
 .pos-payment-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+.pos-payment-grid-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .pos-payment-option { display: flex; min-height: 88px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; margin: 0; border: 1px solid #d9e0eb; border-radius: 13px; color: #475569; background: #fff; cursor: pointer; font-size: .81rem; font-weight: 800; transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease; }
 .pos-payment-option:hover { border-color: #a5b4fc; color: var(--brand); transform: translateY(-1px); }
 .btn-check:checked + .pos-payment-option { border-color: var(--brand); color: var(--brand-dark); background: var(--brand-soft); box-shadow: inset 0 0 0 1px var(--brand); }

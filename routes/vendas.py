@@ -7,6 +7,7 @@ from flask import Blueprint, flash, g, redirect, render_template, request, send_
 from models import (
     EstoqueInsuficiente,
     adicionar_item_comanda,
+    atualizar_pagamento,
     criar_comanda,
     data_hora_loja,
     listar_itens_venda,
@@ -23,7 +24,7 @@ from routes.auth import permission_required
 
 
 vendas_bp = Blueprint("vendas", __name__)
-FORMAS_PAGAMENTO = {"PIX", "CREDITO", "DEBITO", "POINT"}
+FORMAS_PAGAMENTO = {"DINHEIRO", "POINT"}
 
 
 def _valor_monetario(valor):
@@ -45,6 +46,15 @@ def _pagina_iniciar_pagamento(venda):
         ),
         auto_submit=True,
     )
+
+
+def _concluir_cobranca(venda):
+    """Registra dinheiro no caixa ou envia a cobranca ao Point."""
+    if venda["forma_pagamento"] == "DINHEIRO":
+        atualizar_pagamento(venda["id"], "APROVADO")
+        flash("Pagamento em dinheiro registrado. Ticket fechado.", "success")
+        return redirect(url_for("vendas.sucesso", venda_id=venda["id"]))
+    return _pagina_iniciar_pagamento(venda)
 
 
 def _ler_item_formulario():
@@ -99,7 +109,7 @@ def nova_venda():
     try:
         cliente = request.form["cliente"].strip()
         produto_id, quantidade = _ler_item_formulario()
-        forma = request.form.get("forma_pagamento", "PIX")
+        forma = request.form.get("forma_pagamento", "DINHEIRO")
         acao = request.form.get("acao", "ADICIONAR")
         desconto = _valor_monetario(request.form.get("desconto", "0"))
         produto = obter_produto(produto_id, g.usuario["estabelecimento_id"])
@@ -116,7 +126,7 @@ def nova_venda():
             venda = preparar_comanda_para_pagamento(
                 venda_id, forma, desconto, g.usuario["estabelecimento_id"]
             )
-            return _pagina_iniciar_pagamento(venda)
+            return _concluir_cobranca(venda)
     except (EstoqueInsuficiente, ValueError) as erro:
         flash(str(erro), "danger")
         return render_template("venda.html"), 400
@@ -170,7 +180,7 @@ def fechar_comanda(venda_id):
         venda = preparar_comanda_para_pagamento(
             venda_id, forma, desconto, g.usuario["estabelecimento_id"]
         )
-        return _pagina_iniciar_pagamento(venda)
+        return _concluir_cobranca(venda)
     except (KeyError, ValueError, InvalidOperation, EstoqueInsuficiente) as erro:
         flash(str(erro) or "Confira a forma de pagamento e os itens do ticket.", "danger")
         return redirect(url_for("vendas.comanda", venda_id=venda_id))

@@ -45,15 +45,11 @@
           <span class="pos-step">3</span>
           <div><h2>Pagamento ao fechar</h2><p>Escolha a forma somente se for adicionar este item e cobrar agora.</p></div>
         </div>
-        <div class="pos-payment-grid" role="radiogroup" aria-label="Forma de pagamento">
-          <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-pix" value="PIX" checked>
-          <label class="pos-payment-option" for="pagamento-pix"><span class="pos-payment-icon">◈</span><span>Pix</span></label>
-          <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-credito" value="CREDITO">
-          <label class="pos-payment-option" for="pagamento-credito"><span class="pos-payment-icon">▣</span><span>Crédito</span></label>
-          <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-debito" value="DEBITO">
-          <label class="pos-payment-option" for="pagamento-debito"><span class="pos-payment-icon">▤</span><span>Débito</span></label>
+        <div class="pos-payment-grid pos-payment-grid-two" role="radiogroup" aria-label="Forma de pagamento">
           <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-point" value="POINT">
-          <label class="pos-payment-option" for="pagamento-point"><span class="pos-payment-icon">▰</span><span>Point</span></label>
+          <label class="pos-payment-option" for="pagamento-point"><span class="pos-payment-icon">▰</span><span>Maquininha</span></label>
+          <input class="btn-check" type="radio" name="forma_pagamento" id="pagamento-dinheiro" value="DINHEIRO" checked>
+          <label class="pos-payment-option" for="pagamento-dinheiro"><span class="pos-payment-icon">$</span><span>Dinheiro</span></label>
         </div>
         <p class="form-text mb-0" id="ajuda-pagamento">O ticket continuará aberto se você apenas adicionar o item.</p>
       </div>
@@ -138,8 +134,8 @@
   const ajudaPagamento = document.getElementById('ajuda-pagamento'); const textoCobrar = document.getElementById('texto-cobrar');
   document.querySelectorAll('input[name="forma_pagamento"]').forEach(campo => campo.addEventListener('change', () => {
     const point = document.querySelector('input[name="forma_pagamento"]:checked').value === 'POINT';
-    ajudaPagamento.textContent = point ? 'Ao cobrar agora, a cobrança será enviada à maquininha Point.' : 'Ao cobrar agora, o checkout seguro do Mercado Pago será aberto.';
-    textoCobrar.textContent = point ? 'Adicionar e enviar ao Point' : 'Adicionar e cobrar agora';
+    ajudaPagamento.textContent = point ? 'Ao cobrar agora, a cobrança será enviada à maquininha Point.' : 'Ao cobrar agora, o ticket será registrado como pago em dinheiro.';
+    textoCobrar.textContent = point ? 'Adicionar e enviar à maquininha' : 'Adicionar e receber em dinheiro';
   }));
   window.addEventListener('keydown', evento => { if (evento.key === 'F2') { evento.preventDefault(); busca.focus(); } if (evento.key === 'F4') { evento.preventDefault(); quantidade.focus(); quantidade.select(); } });
   atualizarResumo();
