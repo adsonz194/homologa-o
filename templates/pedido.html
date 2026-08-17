@@ -5,21 +5,21 @@
   <div class="col-lg-8">
     <div class="card order-card shadow-sm">
       <div class="card-body p-4 text-center">
-        <p class="text-muted text-uppercase small fw-bold mb-1">Numero do pedido</p>
-        <h1 class="order-number mb-3">#{{ pedido.id }}</h1>
-        <p class="small text-muted mb-3">Codigo de acompanhamento: <code id="codigo-acompanhamento">{{ codigo_acompanhamento }}</code> <button class="btn btn-link btn-sm p-0 align-baseline" type="button" id="copiar-codigo">Copiar</button></p>
+        <p class="text-muted text-uppercase small fw-bold mb-1">Pedido</p>
+        <h1 class="order-number mb-2">#{{ pedido.id }}</h1>
+        <p class="small text-muted mb-3"><code id="codigo-acompanhamento">{{ codigo_acompanhamento }}</code> <button class="btn btn-link btn-sm p-0 align-baseline" type="button" id="copiar-codigo">Copiar</button></p>
         <p class="mb-1"><strong>Total:</strong> R$ {{ '%.2f'|format(pedido.valor_total) }}</p>
         <p class="mb-4">Pagamento: <strong id="status-pagamento">{{ pedido.status_pagamento }}</strong></p>
-        {% if pedido.agendado_para %}<div class="alert alert-primary text-start small"><strong>Pedido agendado para {{ pedido.agendado_para }}.</strong><br>O pagamento e confirmado agora; a preparacao seguira o horario solicitado.</div>{% elif pedido.prazo_entrega_minutos %}<p class="small text-muted">Previsao de entrega: cerca de {{ pedido.prazo_entrega_minutos }} minutos.</p>{% endif %}
+        {% if pedido.agendado_para %}<div class="alert alert-primary text-start small"><strong>Agendado: {{ pedido.agendado_para }}.</strong></div>{% elif pedido.prazo_entrega_minutos %}<p class="small text-muted">Previsão: {{ pedido.prazo_entrega_minutos }} min.</p>{% endif %}
         {% if pedido.forma_pagamento == 'DINHEIRO' %}
-          <div class="alert alert-warning text-start small">Pagamento em <strong>dinheiro na entrega</strong>.<br>Valor informado: <strong>R$ {{ '%.2f'|format(pedido.valor_recebido) }}</strong> &middot; Troco: <strong>R$ {{ '%.2f'|format(pedido.troco) }}</strong>.</div>
+          <div class="alert alert-warning text-start small"><strong>Dinheiro na entrega</strong><br>Troco: <strong>R$ {{ '%.2f'|format(pedido.troco) }}</strong>.</div>
         {% endif %}
         {% if pedido.modalidade_entrega == 'ENTREGA' and pedido.codigo_entrega %}
-          <div class="alert alert-primary text-start small"><strong>Codigo para confirmar a entrega: {{ pedido.codigo_entrega }}</strong><br>Informe este codigo somente ao entregador quando receber o pedido.</div>
+          <div class="alert alert-primary text-start small"><strong>Código de entrega: {{ pedido.codigo_entrega }}</strong><br>Informe ao entregador.</div>
         {% endif %}
 
         <div class="tracking-box p-3 text-start">
-          <p class="mb-1 text-muted small">Acompanhamento do delivery</p>
+          <p class="mb-1 text-muted small">Acompanhamento</p>
           <h2 class="h5 mb-3" id="status-operacional">{{ nome_status_operacional }}</h2>
           <div class="d-flex flex-wrap gap-2 small" id="etapas-entrega">
             <span class="badge text-bg-secondary" data-status="FILA_DE_ESPERA">Fila de espera</span>
@@ -33,16 +33,15 @@
         <div id="confirmacao" class="alert alert-success mt-4 d-none">
           Pagamento aprovado. Voce sera direcionado ao WhatsApp da empresa.
         </div>
-        <a id="botao-whatsapp" class="btn btn-success mt-3" href="#">Enviar mensagem para a empresa no WhatsApp</a>
-        <a class="btn btn-outline-primary mt-3" href="{{ url_nota_pdf }}">Baixar comprovante em PDF</a>
+        <a id="botao-whatsapp" class="btn btn-success mt-3" href="#">WhatsApp</a>
+        <a class="btn btn-outline-primary mt-3" href="{{ url_nota_pdf }}">Comprovante</a>
         {% if pedido.status_pagamento == 'PENDENTE' and pedido.forma_pagamento != 'DINHEIRO' %}
           <form method="post" action="{{ url_reiniciar_pagamento }}" class="mt-3">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button class="btn btn-outline-primary">Tentar pagamento novamente</button>
+            <button class="btn btn-outline-primary">Tentar novamente</button>
           </form>
         {% endif %}
-        <p class="text-muted small mt-3 mb-0">Guarde este codigo para acompanhar a preparacao e a entrega.</p>
-        <a class="btn btn-outline-secondary mt-3" href="{{ url_for('cliente.loja') }}">Voltar para o delivery</a>
+        <a class="btn btn-outline-secondary mt-3" href="{{ url_for('cliente.loja') }}">Cardápio</a>
       </div>
     </div>
   </div>
