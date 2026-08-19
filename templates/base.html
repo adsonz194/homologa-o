@@ -11,9 +11,10 @@
 </head>
 <body class="app-body">
   <header class="app-header">
-    <nav class="container app-navbar d-flex flex-wrap">
+    <nav class="container app-navbar d-flex flex-wrap{% if usuario %} painel-navbar{% endif %}">
       <a class="brand me-auto" href="{{ rota_inicial_painel if usuario else url_for('cliente.loja') }}"><span class="brand-mark">&#128722;</span><span>Menino dos Sonhos</span></a>
-      <div class="nav-actions{% if usuario %} painel-nav{% endif %}">
+      {% if usuario %}<button class="mobile-panel-toggle" type="button" data-mobile-panel-toggle aria-controls="painel-navegacao" aria-expanded="false"><span>Menu</span><span aria-hidden="true">&#9776;</span></button>{% endif %}
+      <div{% if usuario %} id="painel-navegacao"{% endif %} class="nav-actions{% if usuario %} painel-nav{% endif %}">
         {% if usuario %}
           {% if usuario.papel == 'DONO' or 'PEDIDOS' in permissoes_usuario %}<a class="btn btn-outline-light btn-sm" href="{{ url_for('pedidos.index') }}">Pedidos</a>{% endif %}
           {% if usuario.papel == 'DONO' %}
@@ -54,6 +55,12 @@
           const input = document.createElement('input');
           input.type = 'hidden'; input.name = 'csrf_token'; input.value = token; form.appendChild(input);
         }
+      });
+      const toggle = document.querySelector('[data-mobile-panel-toggle]');
+      const panel = document.getElementById('painel-navegacao');
+      toggle?.addEventListener('click', () => {
+        const aberto = panel.classList.toggle('is-open');
+        toggle.setAttribute('aria-expanded', String(aberto));
       });
     })();
   </script>
