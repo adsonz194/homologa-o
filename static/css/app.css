@@ -149,6 +149,9 @@ body.app-body {
 .empty-state { padding: 2.5rem 1rem; color: var(--muted); text-align: center; }
 .app-footer { padding: 24px 0 32px; color: var(--muted); font-size: .84rem; text-align: center; }
 .local-save-action .btn { min-width: 176px; }
+.pedido-quick-actions, .pedido-status-form { display: flex; gap: .5rem; }
+.pedido-quick-actions { margin-bottom: .5rem; }
+.pedido-status-form .form-select { flex: 1; min-width: 0; }
 
 /* PDV / balcão ---------------------------------------------------------- */
 .pos-page { max-width: 1120px; margin: 0 auto; }
@@ -300,6 +303,16 @@ body.app-body {
   .table.mobile-cards td[data-label="Ações"]::before { display: block; margin-bottom: .55rem; }
   .table.mobile-cards .order-actions { display: grid !important; grid-template-columns: 1fr; gap: .55rem !important; }
   .table.mobile-cards .order-actions .form-select, .table.mobile-cards .order-actions .btn { width: 100%; }
+  .pedidos-alert-controls { width: 100%; }
+  .pedidos-alert-controls .btn { min-height: 40px; }
+  .pedidos-alert-controls small { text-align: left !important; }
+  .table.mobile-cards td.pedido-actions { display: block; text-align: left; }
+  .table.mobile-cards td.pedido-actions::before { display: block; margin-bottom: .55rem; }
+  .pedido-quick-actions { display: grid; grid-template-columns: 1fr; gap: .55rem; }
+  .pedido-quick-actions.has-delivery-link { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pedido-quick-actions .btn { min-height: 40px; padding: .42rem .45rem; white-space: nowrap; }
+  .pedido-status-form { display: grid; grid-template-columns: 1fr; gap: .55rem; }
+  .pedido-status-form .form-select, .pedido-status-form .btn { width: 100%; min-height: 42px; }
   .table.mobile-cards td[data-label="Quantidade"] form { display: grid !important; flex: 1 1 auto; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .5rem !important; }
   .table.mobile-cards td[data-label="Quantidade"] form .form-control { width: 100%; max-width: none !important; min-width: 0; }
   .table.mobile-cards td[data-label="Quantidade"] form .btn { min-height: 44px; padding-right: .8rem; padding-left: .8rem; white-space: nowrap; }
